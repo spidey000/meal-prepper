@@ -1,0 +1,203 @@
+import { nanoid } from 'nanoid'
+import { create } from 'zustand'
+import { devtools, persist, createJSONStorage } from 'zustand/middleware'
+import type {
+  DailyMenu,
+  FamilyMember,
+  MealPlanResponse,
+  MealType,
+  Recipe,
+  ShoppingList,
+  WeeklyScheduleDay,
+  UserSettings,
+} from '../types/app'
+
+const defaultMealTypes: MealType[] = ['breakfast', 'lunch', 'dinner']
+
+const defaultSettings: UserSettings = {
+  preferredCuisines: ['mediterranean', 'italian', 'mexican'],
+  mealTypes: defaultMealTypes,
+  defaultMealTimes: {
+    breakfast: '08:00',
+    morningSnack: '10:30',
+    lunch: '13:00',
+    afternoonSnack: '17:00',
+    dinner: '20:00',
+  },
+  defaultMaxCookingMinutes: {
+    breakfast: 20,
+    morningSnack: 10,
+    lunch: 45,
+    afternoonSnack: 10,
+    dinner: 45,
+  },
+  aiModel: 'openrouter/anthropic/claude-3.5-sonnet',
+  apiProvider: 'openrouter',
+}
+
+export interface AppState {
+  family: FamilyMember[]
+  schedule: WeeklyScheduleDay[]
+  recipes: Record<string, Recipe>
+  dailyMenus: DailyMenu[]
+  shoppingList: ShoppingList | null
+  settings: UserSettings
+  guestApiKey?: string
+  lastGeneratedAt?: string
+  isGenerating: boolean
+  actions: {
+    addMember: (member: Omit<FamilyMember, 'id'>) => void
+    updateMember: (member: FamilyMember) => void
+    removeMember: (id: string) => void
+    upsertScheduleDay: (day: WeeklyScheduleDay) => void
+    removeScheduleEvent: (dayId: string, eventId: string) => void
+    setMealPlan: (response: MealPlanResponse) => void
+    setShoppingList: (list: ShoppingList) => void
+    toggleShoppingItem: (category: string, item: string) => void
+    updateShoppingNote: (category: string, item: string, notes: string) => void
+    setSettings: (settings: Partial<UserSettings>) => void
+    setApiKey: (key?: string) => void
+    setGenerating: (value: boolean) => void
+    resetAll: () => void
+  }
+}
+
+const emptyWeek = (): WeeklyScheduleDay[] => {
+  const today = new Date()
+  const start = new Date(today)
+  const day = today.getDay()
+  const diff = today.getDate() - day
+  start.setDate(diff)
+  return Array.from({ length: 7 }).map((_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    const iso = date.toISOString().split('T')[0]
+    return {
+      id: nanoid(),
+      date: iso,
+      dayOfWeek: date.toLocaleDateString(undefined, { weekday: 'long' }),
+      events: [],
+      availability: { lunchMinutes: 45, dinnerMinutes: 45 },
+      diners: { lunch: [], dinner: [] },
+    }
+  }) as WeeklyScheduleDay[]
+}
+
+export const useAppStore = create<AppState>()(
+  devtools(
+    persist(
+      (set, _get) => ({
+        family: [],
+        schedule: emptyWeek(),
+        recipes: {},
+        dailyMenus: [],
+        shoppingList: null,
+        settings: defaultSettings,
+        isGenerating: false,
+        actions: {
+          addMember: (member) =>
+            set((state) => ({
+              family: [...state.family, { ...member, id: nanoid() }],
+            })),
+          updateMember: (member) =>
+            set((state) => ({
+              family: state.family.map((m) => (m.id === member.id ? member : m)),
+            })),
+          removeMember: (id) =>
+            set((state) => ({ family: state.family.filter((m) => m.id !== id) })),
+          upsertScheduleDay: (day) =>
+            set((state) => ({
+              schedule: state.schedule.some((d) => d.id === day.id)
+                ? state.schedule.map((d) => (d.id === day.id ? day : d))
+                : [...state.schedule, day],
+            })),
+          removeScheduleEvent: (dayId, eventId) =>
+            set((state) => ({
+              schedule: state.schedule.map((day) =>
+                day.id === dayId
+                  ? { ...day, events: day.events.filter((event) => event.id !== eventId) }
+                  : day,
+              ),
+            })),
+          setMealPlan: (response) => {
+            const recipeMap = response.recipes.reduce<Record<string, Recipe>>((acc, recipe) => {
+              acc[recipe.id] = recipe
+              return acc
+            }, {})
+            set({
+              recipes: recipeMap,
+              dailyMenus: response.dailyMenus,
+              lastGeneratedAt: new Date().toISOString(),
+            })
+          },
+          setShoppingList: (list) => set({ shoppingList: list }),
+          toggleShoppingItem: (category, item) =>
+            set((state) => ({
+              shoppingList: state.shoppingList
+                ? {
+                    ...state.shoppingList,
+                    categories: state.shoppingList.categories.map((cat) =>
+                      cat.categoryName === category
+                        ? {
+                            ...cat,
+                            items: cat.items.map((listItem) =>
+                              listItem.item === item
+                                ? { ...listItem, checked: !listItem.checked }
+                                : listItem,
+                            ),
+                          }
+                        : cat,
+                    ),
+                  }
+                : null,
+            })),
+          updateShoppingNote: (category, item, notes) =>
+            set((state) => ({
+              shoppingList: state.shoppingList
+                ? {
+                    ...state.shoppingList,
+                    categories: state.shoppingList.categories.map((cat) =>
+                      cat.categoryName === category
+                        ? {
+                            ...cat,
+                            items: cat.items.map((listItem) =>
+                              listItem.item === item ? { ...listItem, notes } : listItem,
+                            ),
+                          }
+                        : cat,
+                    ),
+                  }
+                : null,
+            })),
+          setSettings: (settings) =>
+            set((state) => ({ settings: { ...state.settings, ...settings } })),
+          setApiKey: (key) => set({ guestApiKey: key }),
+          setGenerating: (value) => set({ isGenerating: value }),
+          resetAll: () => set({
+            family: [],
+            schedule: emptyWeek(),
+            recipes: {},
+            dailyMenus: [],
+            shoppingList: null,
+            settings: defaultSettings,
+            guestApiKey: undefined,
+          }),
+        },
+      }),
+      {
+        name: 'meal-prepper-state',
+        storage: createJSONStorage(() => localStorage),
+        partialize: (state) => ({
+          family: state.family,
+          schedule: state.schedule,
+          recipes: state.recipes,
+          dailyMenus: state.dailyMenus,
+          shoppingList: state.shoppingList,
+          settings: state.settings,
+          guestApiKey: state.guestApiKey,
+          lastGeneratedAt: state.lastGeneratedAt,
+        }),
+      },
+    ),
+  ),
+)

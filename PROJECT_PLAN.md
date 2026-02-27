@@ -14,15 +14,15 @@ Legend:
 2. [x] Scaffold Vite React TS template via `npm create vite@latest`.
 3. [x] Install dependencies and capture `package-lock.json`.
    - Re-run `npm install` (first attempt timed out) and verify lockfile is generated.
-4. [ ] Commit & push baseline scaffold once lockfile exists.
+4. [x] Commit & push baseline scaffold once lockfile exists.
 
 ## Phase 1 – Application Foundation (Days 1-2)
-1. [ ] Remove Vite demo assets (logos, counter) and reset `App.tsx` & base styles.
-2. [ ] Introduce design system (Tailwind, tokens, typography, spacing scale, light/dark palettes).
-3. [ ] Configure React Router with authenticated + guest layouts, navigation shell, toasts, loading/skeleton states.
-4. [ ] Add state/query tooling (React Query + Zustand or equivalent) and provider composition.
-5. [ ] Configure environment handling (`.env`, `.env.example`, `vite-env.d.ts`), expose Netlify/Supabase vars safely.
-6. [ ] Implement global error boundary and fallback UI.
+1. [x] Remove Vite demo assets (logos, counter) and reset `App.tsx` & base styles.
+2. [x] Introduce design system (Tailwind, tokens, typography, spacing scale, light/dark palettes).
+3. [x] Configure React Router with authenticated + guest layouts, navigation shell, toasts, loading/skeleton states.
+4. [x] Add state/query tooling (React Query + Zustand or equivalent) and provider composition.
+5. [x] Configure environment handling (`.env`, `.env.example`, `vite-env.d.ts`), expose Netlify/Supabase vars safely.
+6. [x] Implement global error boundary and fallback UI.
 
 ## Phase 2 – Supabase & Auth (Days 2-4)
 1. [ ] Provision Supabase project; enable Google OAuth + email magic links.
@@ -84,5 +84,5 @@ Legend:
 
 ## Next Immediate Actions
 1. ✅ Re-run `npm install` to create `package-lock.json`, then stage scaffold files.
-2. Commit/push baseline scaffold before large changes.
-3. Begin Phase 1 tasks: strip Vite boilerplate, add global styling + routing shell.
+2. ✅ Commit/push baseline scaffold before large changes.
+3. ▶ Begin Phase 2 work: Supabase auth wiring + schema migrations.

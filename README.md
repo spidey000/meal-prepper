@@ -1,73 +1,93 @@
-# React + TypeScript + Vite
+# AI Family Meal Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An opinionated Vite + React + TypeScript application that automates family meal planning, recipe generation, and grocery lists using OpenRouter-powered AI. Authenticated users can sync their data with Supabase, while guests keep everything in local storage.
 
-Currently, two official plugins are available:
+## Tech stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend**: React 19, React Router 7, TailwindCSS 3, Zustand, React Query
+- **Backend services**: Supabase (Auth + Postgres) and Netlify Functions (AI proxy hooks)
+- **AI provider**: [OpenRouter](https://openrouter.ai) with Claude 3.5 Sonnet as the default model
+- **State persistence**: Local storage for guest mode, Supabase tables for authenticated mode (family, schedules, recipes, shopping lists, settings)
 
-## React Compiler
+## Getting started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server runs at http://localhost:5173. Vite automatically proxies API requests to local Netlify functions when you run `netlify dev` in another terminal.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Required environment variables
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Create a `.env` file based on `.env.example` (add this file) with:
+
 ```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_OPENROUTER_API_KEY= # optional fallback for guests
+VITE_OPENROUTER_REFERRER=https://your-domain.com
+VITE_OPENROUTER_TITLE=AI Family Meal Planner
+```
+
+Netlify Functions expect:
+
+```
+OPENROUTER_API_KEY= # service key used when user keys are stored server-side
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_AI_KEYS_TABLE=ai_api_keys
+```
+
+### Supabase schema outline
+
+- `family_members`
+- `weekly_schedules`
+- `recipes`
+- `daily_menus`
+- `shopping_lists`
+- `user_settings` (stores encrypted OpenRouter keys + cuisine prefs)
+- `ai_api_keys` (optional table used by Netlify Functions)
+
+Each table should enforce RLS with policies that scope rows to `auth.uid()`.
+
+## Available scripts
+
+| Script | Description |
+| --- | --- |
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Type-check and create production build |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
+
+## Project structure
+
+```
+src/
+  app/                # Providers and auth contexts
+  components/         # UI primitives + layout
+  pages/              # Feature pages (Family, Schedule, Meal Plan, etc.)
+  services/           # OpenRouter + AI helpers
+  store/              # Zustand store with persistence
+  types/              # Shared TypeScript models
+netlify/functions/    # Serverless AI proxy endpoints (to be implemented)
+```
+
+## AI workflow
+
+1. Gather family + schedule data
+2. Generate weekly meal plan + recipe bundle via OpenRouter
+3. Regenerate individual meals in context
+4. Convert approved recipes into categorized shopping list
+
+All AI calls run through `src/services/mealAI.ts`. You can swap models or providers in one place.
+
+## Deployment checklist
+
+1. Push main to GitHub so Netlify can build automatically
+2. Configure Netlify environment variables (OpenRouter + Supabase)
+3. Expose Supabase URL + anon key to the frontend via Vite env vars
+4. Enable Netlify Functions directory (`netlify/functions`)
+5. Point your domain (Netlify + Cloudflare) and enable HTTPS
+
+Happy cooking!
