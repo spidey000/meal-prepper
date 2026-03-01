@@ -13,6 +13,7 @@ import type {
   UserSettings,
 } from '../types/app'
 import { profileStorage } from './profileStorage'
+import { aiDebug, createAIConfigSnapshot } from '../services/aiDebug'
 
 const defaultMealTypes: MealType[] = ['breakfast', 'lunch', 'dinner']
 
@@ -221,7 +222,26 @@ export const useAppStore = create<AppState>()(
                 : null,
             })),
           setSettings: (settings: Partial<Omit<UserSettings, 'calendarSync'>>) =>
-            set((state) => ({ settings: { ...state.settings, ...settings } })),
+            set((state) => {
+              const nextSettings = { ...state.settings, ...settings }
+              const aiSettingsChanged =
+                typeof settings.aiModel !== 'undefined' ||
+                typeof settings.aiModelMetadata !== 'undefined' ||
+                typeof settings.apiProvider !== 'undefined'
+              if (aiSettingsChanged) {
+                aiDebug.logConfig(
+                  'setSettings',
+                  createAIConfigSnapshot({
+                    model: nextSettings.aiModel,
+                    modelLabel: nextSettings.aiModelMetadata?.label,
+                    supportsJsonResponse: nextSettings.aiModelMetadata?.supportsJsonResponse,
+                    provider: 'openrouter',
+                    metadata: nextSettings.aiModelMetadata,
+                  }),
+                )
+              }
+              return { settings: nextSettings }
+            }),
           setCalendarSyncSettings: (settings) =>
             set((state) => {
               const fallback: CalendarSyncSettings = (defaultSettings.calendarSync ?? {

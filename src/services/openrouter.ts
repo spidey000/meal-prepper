@@ -1,4 +1,5 @@
 import type { OpenRouterModelMetadata } from '../types/app'
+import { aiDebug } from './aiDebug'
 
 const MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
 
@@ -53,6 +54,12 @@ export async function listOpenRouterModels(apiKey?: string): Promise<OpenRouterM
     throw new Error('Missing OpenRouter API key. Add it in Settings to load models.')
   }
 
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  aiDebug.logCallStart({
+    source: 'listOpenRouterModels',
+    request: { endpoint: MODELS_ENDPOINT, hasApiKey: Boolean(key) },
+  })
+
   const response = await fetch(MODELS_ENDPOINT, {
     method: 'GET',
     headers: buildHeaders(key),
@@ -60,10 +67,22 @@ export async function listOpenRouterModels(apiKey?: string): Promise<OpenRouterM
 
   if (!response.ok) {
     const message = await response.text()
+    aiDebug.logError({
+      source: 'listOpenRouterModels',
+      message: `Unable to load models (${response.status})`,
+      error: message || 'Unknown error',
+      severity: 'warn',
+    })
     throw new Error(`Unable to load models (${response.status}): ${message || 'Unknown error'}`)
   }
 
   const payload: ModelsResponse = await response.json()
+  aiDebug.logCallResult({
+    source: 'listOpenRouterModels',
+    status: response.status,
+    durationMs: (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt,
+    response: { count: Array.isArray(payload.data) ? payload.data.length : 0 },
+  })
   if (!Array.isArray(payload.data)) {
     return []
   }
