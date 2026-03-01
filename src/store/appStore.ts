@@ -22,6 +22,8 @@ export const defaultAppPreferences = {
   showNutritionalInfo: true,
   autoBuildShoppingList: true,
   darkMode: true,
+  sidebarCollapsed: false,
+  sidebarMobileOpen: false,
 }
 
 const createDefaultSettings = (): UserSettings => ({
@@ -85,6 +87,8 @@ export interface AppState {
     setGenerating: (value: boolean) => void
     toggleFavorite: (recipeId: string) => void
     isFavorite: (recipeId: string) => boolean
+    toggleSidebar: () => void
+    setSidebarMobileOpen: (open: boolean) => void
     resetAll: () => void
   }
 }
@@ -285,6 +289,26 @@ export const useAppStore = create<AppState>()(
           isFavorite: (recipeId) => {
             return get().favorites.includes(recipeId)
           },
+          toggleSidebar: () =>
+            set((state) => ({
+              settings: {
+                ...state.settings,
+                appPreferences: {
+                  ...state.settings.appPreferences,
+                  sidebarCollapsed: !state.settings.appPreferences.sidebarCollapsed,
+                },
+              },
+            })),
+          setSidebarMobileOpen: (open: boolean) =>
+            set((state) => ({
+              settings: {
+                ...state.settings,
+                appPreferences: {
+                  ...state.settings.appPreferences,
+                  sidebarMobileOpen: open,
+                },
+              },
+            })),
           resetAll: () =>
             set({
               family: [],
