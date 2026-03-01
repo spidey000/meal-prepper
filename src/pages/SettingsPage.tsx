@@ -6,8 +6,9 @@ import { SectionHeader } from '../components/SectionHeader'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
+import { ModelSummary } from '../components/ModelSummary'
 import type { AppPreferences, MealType } from '../types/app'
-import { listOpenRouterModels, type OpenRouterModel } from '../services/openrouter'
+import { isModelFree, listOpenRouterModels, mapModelMetadata, type OpenRouterModel } from '../services/openrouter'
 
 const cuisineLibrary = ['Mediterranean', 'Italian', 'Mexican', 'Japanese', 'Middle Eastern', 'Vegetarian', 'Vegan', 'Gluten-free']
 const mealTypeOptions: MealType[] = ['breakfast', 'morningSnack', 'lunch', 'afternoonSnack', 'dinner']
@@ -70,6 +71,16 @@ export const SettingsPage = () => {
     actions.setSettings({ appPreferences: { ...appPreferences, ...partial } })
   }
 
+  const applyModelSelection = (model: OpenRouterModel) => {
+    actions.setSettings({ aiModel: model.id, aiModelMetadata: mapModelMetadata(model) })
+  }
+
+  const handleModelInput = (value: string) => {
+    const trimmed = value.trim()
+    const match = modelsData?.find((model) => model.id === trimmed)
+    actions.setSettings({ aiModel: trimmed, aiModelMetadata: match ? mapModelMetadata(match) : undefined })
+  }
+
   return (
     <div className="space-y-8">
       <SectionHeader
@@ -119,9 +130,13 @@ export const SettingsPage = () => {
                 <label className="mt-6 block text-sm font-medium text-slate-600">Selected model</label>
                 <Input
                   value={settings.aiModel}
-                  onChange={(e) => actions.setSettings({ aiModel: e.target.value })}
+                  onChange={(e) => handleModelInput(e.target.value)}
                   placeholder="openrouter/anthropic/claude-3.5-sonnet"
                 />
+                <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Current model</p>
+                  <ModelSummary modelId={settings.aiModel} metadata={settings.aiModelMetadata} className="mt-1" />
+                </div>
               </Card>
               <Card>
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -169,7 +184,7 @@ export const SettingsPage = () => {
                           return (
                             <button
                               key={model.id}
-                              onClick={() => actions.setSettings({ aiModel: model.id })}
+                              onClick={() => applyModelSelection(model)}
                               className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                                 selected ? 'border-brand-400 bg-brand-50' : 'border-slate-200 hover:border-brand-300'
                               }`}
@@ -390,16 +405,6 @@ const mealLabels: Record<MealType, string> = {
   lunch: 'Lunch',
   afternoonSnack: 'Afternoon snack',
   dinner: 'Dinner',
-}
-
-const isModelFree = (model: OpenRouterModel) => {
-  const promptCost = model.pricing?.prompt?.price
-  const completionCost = model.pricing?.completion?.price
-  return (
-    (typeof promptCost === 'number' && promptCost === 0 && typeof completionCost === 'number' && completionCost === 0) ||
-    model.id.includes(':free') ||
-    (model.name?.toLowerCase().includes('free') ?? false)
-  )
 }
 
 const filterModels = (models: OpenRouterModel[], search: string, freeOnly: boolean) => {

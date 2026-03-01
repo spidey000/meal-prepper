@@ -137,6 +137,21 @@ export interface AppPreferences {
   autoBuildShoppingList: boolean
 }
 
+export interface ModelPricingMetadata {
+  prompt?: number
+  completion?: number
+}
+
+export interface OpenRouterModelMetadata {
+  id: string
+  label?: string
+  contextLength?: number
+  modality?: string
+  tokenizer?: string
+  isFree?: boolean
+  pricing?: ModelPricingMetadata
+}
+
 export interface UserSettings {
   preferredCuisines: string[]
   mealTypes: MealType[]
@@ -147,6 +162,7 @@ export interface UserSettings {
   apiKey?: string
   calendarSync?: CalendarSyncSettings
   appPreferences: AppPreferences
+  aiModelMetadata?: OpenRouterModelMetadata
 }
 
 export interface MealPlanConfig {

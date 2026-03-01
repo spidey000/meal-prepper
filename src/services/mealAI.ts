@@ -11,19 +11,22 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const DEFAULT_MODEL = 'openrouter/anthropic/claude-3.5-sonnet'
 const PROXY_URL = import.meta.env.VITE_AI_PROXY_URL
 
-interface BaseAIOptions {
+export interface BaseAIOptions {
   apiKey?: string
   model?: string
+  modelLabel?: string
 }
 
 async function callAI<T>({
   messages,
   apiKey,
   model = DEFAULT_MODEL,
+  modelLabel,
 }: {
   messages: { role: 'system' | 'user'; content: string }[]
 } & BaseAIOptions): Promise<T> {
   if (PROXY_URL) {
+    logModelUsage(model, modelLabel)
     const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -44,6 +47,7 @@ async function callAI<T>({
   }
   const referer = import.meta.env.VITE_OPENROUTER_REFERRER ?? window.location.origin
   const title = import.meta.env.VITE_OPENROUTER_TITLE ?? 'AI Family Meal Planner'
+  logModelUsage(model, modelLabel)
 
   const response = await fetch(OPENROUTER_URL, {
     method: 'POST',
@@ -69,6 +73,13 @@ async function callAI<T>({
   const content = data?.choices?.[0]?.message?.content
   if (!content) throw new Error('Malformed OpenRouter response')
   return JSON.parse(content)
+}
+
+const logModelUsage = (modelId: string, modelLabel?: string) => {
+  const label = modelLabel ?? modelId
+  if (typeof console !== 'undefined' && typeof console.info === 'function') {
+    console.info(`[AI] Using model ${label} (${modelId})`)
+  }
 }
 
 

@@ -1,3 +1,5 @@
+import type { OpenRouterModelMetadata } from '../types/app'
+
 const MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models'
 
 interface PricingDetail {
@@ -66,3 +68,26 @@ export async function listOpenRouterModels(apiKey?: string): Promise<OpenRouterM
   }
   return payload.data
 }
+
+export const isModelFree = (model: OpenRouterModel) => {
+  const promptCost = model.pricing?.prompt?.price
+  const completionCost = model.pricing?.completion?.price
+  return (
+    (typeof promptCost === 'number' && promptCost === 0 && typeof completionCost === 'number' && completionCost === 0) ||
+    model.id.includes(':free') ||
+    (model.name?.toLowerCase().includes('free') ?? false)
+  )
+}
+
+export const mapModelMetadata = (model: OpenRouterModel): OpenRouterModelMetadata => ({
+  id: model.id,
+  label: model.name ?? model.id,
+  contextLength: model.context_length,
+  modality: model.architecture?.modality,
+  tokenizer: model.architecture?.tokenizer,
+  isFree: isModelFree(model),
+  pricing: {
+    prompt: model.pricing?.prompt?.price,
+    completion: model.pricing?.completion?.price,
+  },
+})

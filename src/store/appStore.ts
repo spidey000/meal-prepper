@@ -22,7 +22,7 @@ export const defaultAppPreferences = {
   autoBuildShoppingList: true,
 }
 
-const defaultSettings: UserSettings = {
+const createDefaultSettings = (): UserSettings => ({
   preferredCuisines: ['mediterranean', 'italian', 'mexican'],
   mealTypes: defaultMealTypes,
   defaultMealTimes: {
@@ -46,8 +46,11 @@ const defaultSettings: UserSettings = {
     connected: false,
     autoPushEvents: false,
   },
-  appPreferences: defaultAppPreferences,
-}
+  appPreferences: { ...defaultAppPreferences },
+  aiModelMetadata: undefined,
+})
+
+const defaultSettings: UserSettings = createDefaultSettings()
 
 export interface AppState {
   family: FamilyMember[]
@@ -113,7 +116,7 @@ export const useAppStore = create<AppState>()(
         recipes: {},
         dailyMenus: [],
         shoppingList: null,
-        settings: defaultSettings,
+        settings: createDefaultSettings(),
         isGenerating: false,
         lastCalendarSync: undefined,
         actions: {
@@ -252,7 +255,7 @@ export const useAppStore = create<AppState>()(
               recipes: {},
               dailyMenus: [],
               shoppingList: null,
-              settings: defaultSettings,
+              settings: createDefaultSettings(),
               guestApiKey: undefined,
               lastGeneratedAt: undefined,
               lastCalendarSync: undefined,

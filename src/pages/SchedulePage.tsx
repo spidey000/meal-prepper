@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Button } from '../components/ui/Button'
+import { ModelSummary } from '../components/ModelSummary'
 import { parseScheduleFromText } from '../services/mealAI'
 import { fetchCalendarWeek } from '../services/calendar'
 
@@ -28,6 +29,12 @@ export const SchedulePage = () => {
   const lastSyncDisplay = lastCalendarSync ? new Date(lastCalendarSync).toLocaleString() : 'Never'
   const selectedFreeBlocks = selectedDay?.freeBlocks ?? []
   const isBatchCookingDay = selectedDay?.isBatchCookingDay ?? false
+  const modelMetadata = settings.aiModelMetadata
+  const aiOptions = {
+    apiKey: settings.apiKey ?? guestApiKey,
+    model: settings.aiModel,
+    modelLabel: modelMetadata?.label,
+  }
 
   const formatTimeValue = (value: string) => {
     if (!value) return ''
@@ -102,10 +109,7 @@ export const SchedulePage = () => {
     if (!textInput.trim()) return
     try {
       setIsParsing(true)
-      const parsed = await parseScheduleFromText(textInput, weekStart, {
-        apiKey: settings.apiKey ?? guestApiKey,
-        model: settings.aiModel,
-      })
+      const parsed = await parseScheduleFromText(textInput, weekStart, aiOptions)
       parsed.forEach((day) => actions.upsertScheduleDay({
         ...day,
         id: schedule.find((existing) => existing.date === day.date)?.id ?? nanoid(),
@@ -125,19 +129,22 @@ export const SchedulePage = () => {
         title="Weekly schedule"
         description="Sync your events so the AI knows when to recommend quick meals or batch cooking."
         actions={
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                const monday = schedule.find((day) => new Date(day.date).getDay() === 1)
-                setSelectedDayId(monday?.id ?? schedule[0]?.id ?? '')
-              }}
-            >
-              Jump to Monday
-            </Button>
-            <Button onClick={handleParseText} disabled={isParsing || !textInput.trim()}>
-              {isParsing ? 'Parsing…' : 'Parse text schedule'}
-            </Button>
+          <div className="flex flex-col items-end gap-2">
+            <ModelSummary modelId={settings.aiModel} metadata={modelMetadata} size="sm" />
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const monday = schedule.find((day) => new Date(day.date).getDay() === 1)
+                  setSelectedDayId(monday?.id ?? schedule[0]?.id ?? '')
+                }}
+              >
+                Jump to Monday
+              </Button>
+              <Button onClick={handleParseText} disabled={isParsing || !textInput.trim()}>
+                {isParsing ? 'Parsing…' : 'Parse text schedule'}
+              </Button>
+            </div>
           </div>
         }
       />

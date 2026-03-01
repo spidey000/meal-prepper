@@ -5,7 +5,9 @@ import { useAppStore, defaultAppPreferences } from '../store/appStore'
 import { SectionHeader } from '../components/SectionHeader'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { ModelSummary } from '../components/ModelSummary'
 import { generateMealPlan, regenerateMeal, generateShoppingList } from '../services/mealAI'
+import type { BaseAIOptions } from '../services/mealAI'
 import type { DailyMenu, MealPlanResponse, MealType, Recipe, ShoppingList } from '../types/app'
 
 const mealLabels: Record<MealType, string> = {
@@ -22,6 +24,12 @@ export const MealPlanPage = () => {
   const [weekStart, setWeekStart] = useState(schedule[0]?.date ?? new Date().toISOString().split('T')[0])
   const canGenerate = family.length > 0 && !!(settings.apiKey ?? guestApiKey ?? import.meta.env.VITE_OPENROUTER_API_KEY)
   const appPreferences = settings.appPreferences ?? defaultAppPreferences
+  const modelMetadata = settings.aiModelMetadata
+  const aiOptions: BaseAIOptions = {
+    apiKey: settings.apiKey ?? guestApiKey,
+    model: settings.aiModel,
+    modelLabel: modelMetadata?.label,
+  }
 
   const orderedMenus = useMemo(() =>
     [...dailyMenus].sort((a, b) => a.date.localeCompare(b.date)), [dailyMenus])
@@ -36,10 +44,10 @@ export const MealPlanPage = () => {
         schedule,
         settings,
       }
-      const plan = await generateMealPlan(config, { apiKey: settings.apiKey ?? guestApiKey, model: settings.aiModel })
+      const plan = await generateMealPlan(config, aiOptions)
       actions.setMealPlan(plan)
       if (appPreferences.autoBuildShoppingList) {
-        await buildShoppingListFromPlan(plan, weekStart, settings.apiKey ?? guestApiKey, settings.aiModel, actions.setShoppingList)
+        await buildShoppingListFromPlan(plan, weekStart, aiOptions, actions.setShoppingList)
       }
     } catch (error) {
       console.error(error)
@@ -53,7 +61,7 @@ export const MealPlanPage = () => {
     const previousRecipe = previousRecipeId ? recipes[previousRecipeId]?.name : undefined
     try {
       actions.setGenerating(true)
-      const recipe = await regenerateMeal({ config: { startDate: weekStart, members: family, schedule, settings }, meal: { date, mealType }, previousRecipe }, { apiKey: settings.apiKey ?? guestApiKey, model: settings.aiModel })
+      const recipe = await regenerateMeal({ config: { startDate: weekStart, members: family, schedule, settings }, meal: { date, mealType }, previousRecipe }, aiOptions)
       const updatedPlan = {
         dailyMenus: orderedMenus.map((menu) => {
           if (menu.date !== date) return menu
@@ -83,7 +91,7 @@ export const MealPlanPage = () => {
     try {
       const list = await generateShoppingList(
         { recipes: recipeList, weekStartDate: weekStart },
-        { apiKey: settings.apiKey ?? guestApiKey, model: settings.aiModel },
+        aiOptions,
       )
       actions.setShoppingList(list)
     } catch (error) {
@@ -98,16 +106,19 @@ export const MealPlanPage = () => {
         title="Weekly AI meal plan"
         description="Generate a plan tailored to allergies, preferences, and your actual availability."
         actions={
-          <div className="flex items-center gap-3">
-            <input
-              type="date"
-              value={weekStart}
-              onChange={(e) => setWeekStart(e.target.value)}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
-            />
-            <Button onClick={handleGenerate} disabled={!canGenerate || isGenerating}>
-              <Sparkles className="h-4 w-4" /> {isGenerating ? 'Thinking…' : 'Generate meal plan'}
-            </Button>
+          <div className="flex flex-col items-end gap-2">
+            <ModelSummary modelId={settings.aiModel} metadata={modelMetadata} size="sm" />
+            <div className="flex items-center gap-3">
+              <input
+                type="date"
+                value={weekStart}
+                onChange={(e) => setWeekStart(e.target.value)}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+              />
+              <Button onClick={handleGenerate} disabled={!canGenerate || isGenerating}>
+                <Sparkles className="h-4 w-4" /> {isGenerating ? 'Thinking…' : 'Generate meal plan'}
+              </Button>
+            </div>
           </div>
         }
       />
@@ -215,8 +226,7 @@ const collectRecipesFromMenus = (menus: DailyMenu[], recipeMap: Record<string, R
 const buildShoppingListFromPlan = async (
   plan: MealPlanResponse,
   weekStart: string,
-  apiKey: string | undefined,
-  model: string,
+  options: BaseAIOptions,
   setShoppingList: (list: ShoppingList) => void,
 ) => {
   const map = plan.recipes.reduce<Record<string, Recipe>>((acc, recipe) => {
@@ -226,7 +236,7 @@ const buildShoppingListFromPlan = async (
   const recipeList = collectRecipesFromMenus(plan.dailyMenus, map)
   if (recipeList.length === 0) return
   try {
-    const list = await generateShoppingList({ recipes: recipeList, weekStartDate: weekStart }, { apiKey, model })
+    const list = await generateShoppingList({ recipes: recipeList, weekStartDate: weekStart }, options)
     setShoppingList(list)
   } catch (error) {
     console.error('Auto shopping list failed', error)
