@@ -135,6 +135,7 @@ export interface AppPreferences {
   compactMode: boolean
   showNutritionalInfo: boolean
   autoBuildShoppingList: boolean
+  darkMode: boolean
 }
 
 export interface ModelPricingMetadata {

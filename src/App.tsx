@@ -1,7 +1,14 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppProviders } from './app/providers/AppProviders'
 import { AppLayout } from './components/layout/AppLayout'
-import { FamilyPage, MealPlanPage, SchedulePage, ShoppingListPage, SettingsPage } from './pages'
+import {
+  FamilyPage,
+  MealPlanPage,
+  SchedulePage,
+  ShoppingListPage,
+  SettingsPage,
+  FavoritesPage,
+} from './pages'
 
 function App() {
   return (
@@ -14,6 +21,7 @@ function App() {
             <Route path="/family" element={<FamilyPage />} />
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/shopping-list" element={<ShoppingListPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

@@ -21,18 +21,22 @@ export const ModelSummary = ({ modelId, metadata, className, size = 'md' }: Mode
   const modality = metadata?.modality ?? metadata?.tokenizer
 
   return (
-    <div className={clsx('flex flex-wrap items-center gap-2 text-slate-500', sizeStyles[size], className)}>
-      <span className="font-semibold text-slate-900">{label}</span>
+    <div
+      className={clsx(
+        'flex flex-wrap items-center gap-2 text-surface-500',
+        sizeStyles[size],
+        className,
+      )}
+    >
+      <span className="font-semibold text-surface-300">{label}</span>
       {metadata?.isFree && (
-        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Free tier</span>
+        <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-semibold text-brand-400">
+          Free tier
+        </span>
       )}
       {context && <span>Context {context.toLocaleString()} tokens</span>}
-      {typeof prompt === 'number' && (
-        <span>Prompt ${formatPrice(prompt)}</span>
-      )}
-      {typeof completion === 'number' && (
-        <span>Completion ${formatPrice(completion)}</span>
-      )}
+      {typeof prompt === 'number' && <span>Prompt ${formatPrice(prompt)}</span>}
+      {typeof completion === 'number' && <span>Completion ${formatPrice(completion)}</span>}
       {modality && <span>{modality}</span>}
     </div>
   )

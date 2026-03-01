@@ -21,6 +21,7 @@ export const defaultAppPreferences = {
   compactMode: false,
   showNutritionalInfo: true,
   autoBuildShoppingList: true,
+  darkMode: true,
 }
 
 const createDefaultSettings = (): UserSettings => ({
@@ -64,6 +65,7 @@ export interface AppState {
   lastGeneratedAt?: string
   lastCalendarSync?: string
   isGenerating: boolean
+  favorites: string[]
   actions: {
     addMember: (member: Omit<FamilyMember, 'id'>) => void
     updateMember: (member: FamilyMember) => void
@@ -81,6 +83,8 @@ export interface AppState {
     setApiKey: (key?: string) => void
     setLastCalendarSync: (iso?: string) => void
     setGenerating: (value: boolean) => void
+    toggleFavorite: (recipeId: string) => void
+    isFavorite: (recipeId: string) => boolean
     resetAll: () => void
   }
 }
@@ -111,7 +115,7 @@ const emptyWeek = (): WeeklyScheduleDay[] => {
 export const useAppStore = create<AppState>()(
   devtools(
     persist(
-      (set) => ({
+      (set, get) => ({
         family: [],
         schedule: emptyWeek(),
         recipes: {},
@@ -120,6 +124,7 @@ export const useAppStore = create<AppState>()(
         settings: createDefaultSettings(),
         isGenerating: false,
         lastCalendarSync: undefined,
+        favorites: [],
         actions: {
           addMember: (member) =>
             set((state) => ({
@@ -268,6 +273,18 @@ export const useAppStore = create<AppState>()(
           setApiKey: (key) => set({ guestApiKey: key }),
           setLastCalendarSync: (iso) => set({ lastCalendarSync: iso }),
           setGenerating: (value) => set({ isGenerating: value }),
+          toggleFavorite: (recipeId) =>
+            set((state) => {
+              const isFav = state.favorites.includes(recipeId)
+              return {
+                favorites: isFav
+                  ? state.favorites.filter((id) => id !== recipeId)
+                  : [...state.favorites, recipeId],
+              }
+            }),
+          isFavorite: (recipeId) => {
+            return get().favorites.includes(recipeId)
+          },
           resetAll: () =>
             set({
               family: [],
@@ -280,6 +297,7 @@ export const useAppStore = create<AppState>()(
               lastGeneratedAt: undefined,
               lastCalendarSync: undefined,
               isGenerating: false,
+              favorites: [],
             }),
         },
       }),
@@ -296,6 +314,7 @@ export const useAppStore = create<AppState>()(
           guestApiKey: state.guestApiKey,
           lastGeneratedAt: state.lastGeneratedAt,
           lastCalendarSync: state.lastCalendarSync,
+          favorites: state.favorites,
         }),
       },
     ),
