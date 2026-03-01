@@ -150,6 +150,7 @@ export interface OpenRouterModelMetadata {
   tokenizer?: string
   isFree?: boolean
   pricing?: ModelPricingMetadata
+  supportsJsonResponse?: boolean
 }
 
 export interface UserSettings {

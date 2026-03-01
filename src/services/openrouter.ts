@@ -18,6 +18,7 @@ export interface OpenRouterModel {
   pricing?: ModelPricing
   context_length?: number
   tags?: string[]
+  supported_parameters?: string[]
   architecture?: {
     tokenizer?: string
     modality?: string
@@ -73,7 +74,10 @@ export const isModelFree = (model: OpenRouterModel) => {
   const promptCost = model.pricing?.prompt?.price
   const completionCost = model.pricing?.completion?.price
   return (
-    (typeof promptCost === 'number' && promptCost === 0 && typeof completionCost === 'number' && completionCost === 0) ||
+    (typeof promptCost === 'number' &&
+      promptCost === 0 &&
+      typeof completionCost === 'number' &&
+      completionCost === 0) ||
     model.id.includes(':free') ||
     (model.name?.toLowerCase().includes('free') ?? false)
   )
@@ -90,4 +94,5 @@ export const mapModelMetadata = (model: OpenRouterModel): OpenRouterModelMetadat
     prompt: model.pricing?.prompt?.price,
     completion: model.pricing?.completion?.price,
   },
+  supportsJsonResponse: model.supported_parameters?.includes('response_format'),
 })

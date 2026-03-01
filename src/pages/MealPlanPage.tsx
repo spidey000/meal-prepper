@@ -20,19 +20,37 @@ const mealLabels: Record<MealType, string> = {
 const supportedMealTypes = Object.keys(mealLabels) as MealType[]
 
 export const MealPlanPage = () => {
-  const { family, schedule, dailyMenus, recipes, settings, guestApiKey, actions, isGenerating, shoppingList, lastGeneratedAt } = useAppStore()
-  const [weekStart, setWeekStart] = useState(schedule[0]?.date ?? new Date().toISOString().split('T')[0])
-  const canGenerate = family.length > 0 && !!(settings.apiKey ?? guestApiKey ?? import.meta.env.VITE_OPENROUTER_API_KEY)
+  const {
+    family,
+    schedule,
+    dailyMenus,
+    recipes,
+    settings,
+    guestApiKey,
+    actions,
+    isGenerating,
+    shoppingList,
+    lastGeneratedAt,
+  } = useAppStore()
+  const [weekStart, setWeekStart] = useState(
+    schedule[0]?.date ?? new Date().toISOString().split('T')[0],
+  )
+  const canGenerate =
+    family.length > 0 &&
+    !!(settings.apiKey ?? guestApiKey ?? import.meta.env.VITE_OPENROUTER_API_KEY)
   const appPreferences = settings.appPreferences ?? defaultAppPreferences
   const modelMetadata = settings.aiModelMetadata
   const aiOptions: BaseAIOptions = {
     apiKey: settings.apiKey ?? guestApiKey,
     model: settings.aiModel,
     modelLabel: modelMetadata?.label,
+    supportsJsonResponse: modelMetadata?.supportsJsonResponse,
   }
 
-  const orderedMenus = useMemo(() =>
-    [...dailyMenus].sort((a, b) => a.date.localeCompare(b.date)), [dailyMenus])
+  const orderedMenus = useMemo(
+    () => [...dailyMenus].sort((a, b) => a.date.localeCompare(b.date)),
+    [dailyMenus],
+  )
 
   const handleGenerate = async () => {
     if (!canGenerate) return alert('Add family profiles and an AI key first.')
@@ -61,7 +79,14 @@ export const MealPlanPage = () => {
     const previousRecipe = previousRecipeId ? recipes[previousRecipeId]?.name : undefined
     try {
       actions.setGenerating(true)
-      const recipe = await regenerateMeal({ config: { startDate: weekStart, members: family, schedule, settings }, meal: { date, mealType }, previousRecipe }, aiOptions)
+      const recipe = await regenerateMeal(
+        {
+          config: { startDate: weekStart, members: family, schedule, settings },
+          meal: { date, mealType },
+          previousRecipe,
+        },
+        aiOptions,
+      )
       const updatedPlan = {
         dailyMenus: orderedMenus.map((menu) => {
           if (menu.date !== date) return menu
@@ -123,7 +148,9 @@ export const MealPlanPage = () => {
         }
       />
       {lastGeneratedAt && (
-        <p className="text-sm text-slate-500">Last generated {format(new Date(lastGeneratedAt), 'PPpp')}</p>
+        <p className="text-sm text-slate-500">
+          Last generated {format(new Date(lastGeneratedAt), 'PPpp')}
+        </p>
       )}
       {orderedMenus.length === 0 && (
         <Card>
@@ -137,8 +164,12 @@ export const MealPlanPage = () => {
           <Card key={menu.date} className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">{format(new Date(menu.date), 'eeee')}</p>
-                <p className="text-lg font-semibold text-slate-900">{format(new Date(menu.date), 'MMM d')}</p>
+                <p className="text-xs uppercase tracking-wide text-slate-400">
+                  {format(new Date(menu.date), 'eeee')}
+                </p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {format(new Date(menu.date), 'MMM d')}
+                </p>
               </div>
             </div>
             <div className="space-y-3">
@@ -146,16 +177,25 @@ export const MealPlanPage = () => {
                 const slot = menu[mealType]
                 const recipe = slot?.recipeId ? recipes[slot.recipeId] : undefined
                 return (
-                  <div key={`${menu.date}-${mealType}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <div
+                    key={`${menu.date}-${mealType}`}
+                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs uppercase tracking-wide text-slate-400">{mealLabels[mealType]}</p>
-                        <p className="text-sm font-medium text-slate-900">{slot?.name ?? 'Not generated'}</p>
+                        <p className="text-xs uppercase tracking-wide text-slate-400">
+                          {mealLabels[mealType]}
+                        </p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {slot?.name ?? 'Not generated'}
+                        </p>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRegenerate(menu.date, mealType, slot?.recipeId ?? undefined)}
+                        onClick={() =>
+                          handleRegenerate(menu.date, mealType, slot?.recipeId ?? undefined)
+                        }
                         disabled={isGenerating}
                       >
                         Regenerate
@@ -196,12 +236,17 @@ export const MealPlanPage = () => {
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-4">
-        <Button variant="secondary" onClick={handleShoppingList} disabled={orderedMenus.length === 0}>
+        <Button
+          variant="secondary"
+          onClick={handleShoppingList}
+          disabled={orderedMenus.length === 0}
+        >
           Build shopping list
         </Button>
         {shoppingList && (
           <p className="text-sm text-slate-500">
-            Shopping list ready with {shoppingList.categories.reduce((total, cat) => total + cat.items.length, 0)} items.
+            Shopping list ready with{' '}
+            {shoppingList.categories.reduce((total, cat) => total + cat.items.length, 0)} items.
           </p>
         )}
       </div>
@@ -236,7 +281,10 @@ const buildShoppingListFromPlan = async (
   const recipeList = collectRecipesFromMenus(plan.dailyMenus, map)
   if (recipeList.length === 0) return
   try {
-    const list = await generateShoppingList({ recipes: recipeList, weekStartDate: weekStart }, options)
+    const list = await generateShoppingList(
+      { recipes: recipeList, weekStartDate: weekStart },
+      options,
+    )
     setShoppingList(list)
   } catch (error) {
     console.error('Auto shopping list failed', error)
