@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
+import { Link } from 'react-router-dom'
 import { Sparkles, RefreshCw, ShoppingCart } from 'lucide-react'
 import { useAppStore, defaultAppPreferences } from '../store/appStore'
 import { SectionHeader } from '../components/SectionHeader'
@@ -212,9 +213,18 @@ export const MealPlanPage = () => {
                         <p className="text-xs uppercase tracking-wide text-surface-500">
                           {mealLabels[mealType]}
                         </p>
-                        <p className="mt-0.5 text-sm font-medium text-surface-200">
-                          {slot?.name ?? 'Not generated'}
-                        </p>
+                        {slot?.recipeId ? (
+                          <Link
+                            to={`/recipe/${slot.recipeId}`}
+                            className="mt-0.5 text-sm font-medium text-ember-400 transition-colors hover:text-ember-300"
+                          >
+                            {slot.name}
+                          </Link>
+                        ) : (
+                          <p className="mt-0.5 text-sm font-medium text-surface-200">
+                            {slot?.name ?? 'Not generated'}
+                          </p>
+                        )}
                       </div>
                       <Button
                         variant="ghost"

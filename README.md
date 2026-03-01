@@ -2,6 +2,14 @@
 
 An opinionated Vite + React + TypeScript application that automates family meal planning, recipe generation, and grocery lists using OpenRouter-powered AI. Everything runs locally in the browser under a username you choose—no remote accounts or Supabase project required.
 
+## ✨ New Features
+
+- **Recipe Detail Page**: Click any recipe name to view full details including complete ingredients, instructions, and nutritional information
+- **Ingredient Exclusion**: Select ingredients to exclude and regenerate recipes using AI that respects your choices
+- **Enhanced UI/UX**: Dark theme with consistent `surface-*` palette, smooth animations, and improved accessibility
+- **Toast Notifications**: Real-time feedback for user actions (success, error, warning states)
+- **Improved Navigation**: Direct links to recipe details from Meal Plan and Favorites pages
+
 ## Tech stack
 
 - **Frontend**: React 19, React Router 7, TailwindCSS 3, Zustand, React Query
@@ -38,12 +46,12 @@ OPENROUTER_API_KEY= # service key used when user keys are stored server-side
 
 ## Available scripts
 
-| Script | Description |
-| --- | --- |
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Type-check and create production build |
-| `npm run preview` | Preview the production build |
-| `npm run lint` | Run ESLint |
+| Script            | Description                            |
+| ----------------- | -------------------------------------- |
+| `npm run dev`     | Start Vite dev server                  |
+| `npm run build`   | Type-check and create production build |
+| `npm run preview` | Preview the production build           |
+| `npm run lint`    | Run ESLint                             |
 
 ## Project structure
 
@@ -51,26 +59,80 @@ OPENROUTER_API_KEY= # service key used when user keys are stored server-side
 src/
   app/                # Providers and auth contexts
   components/         # UI primitives + layout
-  pages/              # Feature pages (Family, Schedule, Meal Plan, etc.)
+  pages/              # Feature pages (Family, Schedule, Meal Plan, Recipe Detail, etc.)
   services/           # OpenRouter + AI helpers
   store/              # Zustand store with persistence
   types/              # Shared TypeScript models
 netlify/functions/    # Serverless AI proxy endpoints (to be implemented)
 ```
 
+## Key Features
+
+### 📋 Meal Planning
+
+- Generate weekly meal plans tailored to family allergies, preferences, and schedule
+- View recipes inline with ingredient previews and nutritional info
+- Regenerate individual meals while maintaining weekly context
+
+### 🍳 Recipe Details
+
+- Click any recipe name to view complete details
+- See full ingredient list, instructions, cooking times, and nutritional information
+- View recipe tags and difficulty level
+
+### 🚫 Ingredient Exclusion
+
+- Select ingredients to exclude from a recipe
+- AI regenerates alternatives that avoid selected ingredients
+- Clear all selections with one click
+- Excluded ingredients are visually highlighted with strikethrough
+
+### ⭐ Favorites System
+
+- Mark recipes as favorites from any page
+- Dedicated Favorites page to quickly access your go-to meals
+- Favorite state persists across sessions
+
+### 🛒 Smart Shopping Lists
+
+- Automatically aggregate ingredients from your meal plan
+- Categorized by grocery aisle for efficient shopping
+- Editable quantities and notes
+
+### 👨‍👩‍👧‍👦 Family Profiles
+
+- Add family members with allergies, dietary preferences, and activity levels
+- Include age, weight, height for nutritional calculations
+- Set school/work schedules for meal planning context
+
+### ⏰ Schedule & Availability
+
+- Weekly calendar with manual availability settings
+- Google Calendar sync integration (OAuth)
+- ICS file import support
+- Batch cooking day markers
+
 ## AI workflow
 
 1. Gather family + schedule data
 2. Generate weekly meal plan + recipe bundle via OpenRouter
-3. Regenerate individual meals in context
-4. Convert approved recipes into categorized shopping list
+3. View recipe details and exclude unwanted ingredients
+4. Regenerate specific recipes while respecting exclusions
+5. Convert approved recipes into categorized shopping list
 
 All AI calls run through `src/services/mealAI.ts`. You can swap models or providers in one place.
 
+## UI/UX Features
+
+- **Dark Theme**: Carefully crafted `surface-*` color palette with ember and brand accents
+- **Accessibility**: Keyboard navigation, ARIA labels, proper touch targets (44×44px minimum)
+- **Animations**: Smooth transitions, hover effects, loading skeletons, and micro-interactions
+- **Responsive**: Mobile-first design that works on all screen sizes
+- **Feedback**: Toast notifications for all user actions
 
 ## AI debug logging
 
-The app now includes structured, verbose AI logging in `src/services/aiDebug.ts` and integrates it across AI call flows in `src/services/mealAI.ts` and model discovery in `src/services/openrouter.ts`.
+The app includes structured, verbose AI logging in `src/services/aiDebug.ts` and integrates it across AI call flows in `src/services/mealAI.ts` and model discovery in `src/services/openrouter.ts`.
 
 ### Toggle verbose logs
 
@@ -99,6 +161,24 @@ Example output shape:
 ```
 
 AI configuration snapshots are logged on Meal Plan initialization and whenever relevant AI settings are updated.
+
+## Recent Changes
+
+### Recipe Detail & Regeneration System
+
+- Added `RecipePage` component with full recipe display
+- Implemented ingredient exclusion with checkboxes
+- AI respects excluded ingredients when regenerating
+- `replaceRecipe` store action preserves meal plan integrity
+- Added validation to ensure recipe belongs to a meal plan before regeneration
+
+### UI Improvements
+
+- Unified color palette to `surface-*` across all pages
+- Enhanced Card components with hover effects and transitions
+- Improved loading states with skeleton screens
+- Added Toast notification system for better feedback
+- Enhanced accessibility with proper ARIA labels and keyboard navigation
 
 ## Deployment checklist
 

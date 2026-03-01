@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Star, Clock, Users } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { SectionHeader } from '../components/SectionHeader'
@@ -24,11 +25,11 @@ export const FavoritesPage = () => {
 
       {!hasFavorites ? (
         <Card className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 rounded-full bg-rose-50 p-4">
-            <Star className="h-8 w-8 text-rose-300" />
+          <div className="mb-4 rounded-full bg-rose-500/10 p-4">
+            <Star className="h-8 w-8 text-rose-400" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-slate-900">No favorites yet</h3>
-          <p className="max-w-sm text-sm text-slate-500">
+          <h3 className="mb-2 text-lg font-semibold text-surface-100">No favorites yet</h3>
+          <p className="max-w-sm text-sm text-surface-400">
             Click the star icon on any recipe in your meal plan to add it here for quick access.
           </p>
         </Card>
@@ -37,31 +38,34 @@ export const FavoritesPage = () => {
           {favoriteRecipes.map((recipe) => (
             <Card
               key={recipe.id}
-              className="group relative flex flex-col transition-shadow hover:shadow-lg"
+              className="group relative flex flex-col transition-all duration-300 hover:border-surface-600/50 hover:shadow-surface-800/50"
             >
               <div className="mb-3 flex items-start justify-between">
-                <h3 className="line-clamp-1 pr-8 text-lg font-semibold text-slate-900">
+                <Link
+                  to={`/recipe/${recipe.id}`}
+                  className="line-clamp-1 pr-8 text-lg font-semibold text-surface-100 transition-colors hover:text-ember-400"
+                >
                   {recipe.name}
-                </h3>
+                </Link>
                 <div className="absolute right-4 top-4">
                   <FavoriteButton recipeId={recipe.id} recipeName={recipe.name} size="sm" />
                 </div>
               </div>
 
               {recipe.description && (
-                <p className="mb-4 line-clamp-2 text-sm text-slate-500">{recipe.description}</p>
+                <p className="mb-4 line-clamp-2 text-sm text-surface-400">{recipe.description}</p>
               )}
 
-              <div className="mt-auto flex flex-wrap gap-3 text-xs text-slate-400">
+              <div className="mt-auto flex flex-wrap gap-3 text-xs text-surface-500">
                 <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
+                  <Clock className="h-3 w-3 text-ember-400" />
                   {recipe.prepTimeMinutes + recipe.cookingTimeMinutes} min
                 </span>
                 <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
+                  <Users className="h-3 w-3 text-brand-400" />
                   {recipe.servesPeople} servings
                 </span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 capitalize text-slate-600">
+                <span className="rounded-full bg-surface-800 px-2 py-0.5 capitalize text-surface-300">
                   {recipe.difficulty}
                 </span>
               </div>
@@ -71,7 +75,7 @@ export const FavoritesPage = () => {
                   {recipe.tags.slice(0, 4).map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700"
+                      className="rounded-full border border-brand-500/20 bg-brand-500/10 px-2 py-0.5 text-[10px] font-medium text-brand-300"
                     >
                       {tag}
                     </span>
@@ -79,18 +83,18 @@ export const FavoritesPage = () => {
                 </div>
               )}
 
-              <div className="mt-4 rounded-xl bg-slate-50 p-3">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <div className="mt-4 rounded-xl border border-surface-700/30 bg-surface-800/50 p-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-surface-500">
                   Ingredients
                 </p>
-                <ul className="space-y-1 text-xs text-slate-600">
+                <ul className="space-y-1 text-xs text-surface-400">
                   {recipe.ingredients.slice(0, 5).map((ing) => (
                     <li key={ing.item}>
                       {ing.quantity} {ing.unit} {ing.item}
                     </li>
                   ))}
                   {recipe.ingredients.length > 5 && (
-                    <li className="text-slate-400">+{recipe.ingredients.length - 5} more</li>
+                    <li className="text-surface-500">+{recipe.ingredients.length - 5} more</li>
                   )}
                 </ul>
               </div>
@@ -100,7 +104,7 @@ export const FavoritesPage = () => {
       )}
 
       {hasFavorites && (
-        <p className="text-center text-sm text-slate-400">
+        <p className="text-center text-sm text-surface-500">
           {favoriteRecipes.length} favorite{favoriteRecipes.length !== 1 ? 's' : ''}
         </p>
       )}

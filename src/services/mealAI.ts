@@ -601,13 +601,20 @@ export async function regenerateMeal(
     config,
     meal,
     previousRecipe,
-  }: { config: MealPlanConfig; meal: { date: string; mealType: string }; previousRecipe?: string },
+    excludedIngredients,
+  }: {
+    config: MealPlanConfig
+    meal: { date: string; mealType: string }
+    previousRecipe?: string
+    excludedIngredients?: string[]
+  },
   options: BaseAIOptions,
 ): Promise<Recipe> {
   const prompt = `Regenerate a recipe for ${meal.mealType} on ${meal.date}. Avoid repeating ${previousRecipe ?? 'the previous dish'}.
 Family members: ${JSON.stringify(summarizeFamily(config.members))}
 Schedule: ${JSON.stringify(summarizeSchedule(config.schedule))}
 Preferred cuisines: ${JSON.stringify(config.settings.preferredCuisines)}
+${excludedIngredients && excludedIngredients.length > 0 ? `Avoid these ingredients: ${excludedIngredients.join(', ')}` : ''}
 Return JSON Recipe object.`
 
   return callAI<Recipe>({

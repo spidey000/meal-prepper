@@ -90,6 +90,7 @@ export interface AppState {
     toggleSidebar: () => void
     setSidebarMobileOpen: (open: boolean) => void
     resetAll: () => void
+    replaceRecipe: (oldRecipeId: string, newRecipe: Recipe) => void
   }
 }
 
@@ -322,6 +323,45 @@ export const useAppStore = create<AppState>()(
               lastCalendarSync: undefined,
               isGenerating: false,
               favorites: [],
+            }),
+          replaceRecipe: (oldRecipeId, newRecipe) =>
+            set((state) => {
+              const newRecipes = { ...state.recipes, [newRecipe.id]: newRecipe }
+              delete newRecipes[oldRecipeId]
+
+              const updatedDailyMenus = state.dailyMenus.map((menu): DailyMenu => {
+                const breakfast =
+                  menu.breakfast?.recipeId === oldRecipeId
+                    ? { ...menu.breakfast, recipeId: newRecipe.id, name: newRecipe.name }
+                    : menu.breakfast
+                const morningSnack =
+                  menu.morningSnack?.recipeId === oldRecipeId
+                    ? { ...menu.morningSnack, recipeId: newRecipe.id, name: newRecipe.name }
+                    : menu.morningSnack
+                const lunch =
+                  menu.lunch?.recipeId === oldRecipeId
+                    ? { ...menu.lunch, recipeId: newRecipe.id, name: newRecipe.name }
+                    : menu.lunch
+                const afternoonSnack =
+                  menu.afternoonSnack?.recipeId === oldRecipeId
+                    ? { ...menu.afternoonSnack, recipeId: newRecipe.id, name: newRecipe.name }
+                    : menu.afternoonSnack
+                const dinner =
+                  menu.dinner?.recipeId === oldRecipeId
+                    ? { ...menu.dinner, recipeId: newRecipe.id, name: newRecipe.name }
+                    : menu.dinner
+
+                return {
+                  ...menu,
+                  breakfast: breakfast ?? null,
+                  morningSnack: morningSnack ?? null,
+                  lunch: lunch ?? null,
+                  afternoonSnack: afternoonSnack ?? null,
+                  dinner: dinner ?? null,
+                }
+              })
+
+              return { recipes: newRecipes, dailyMenus: updatedDailyMenus }
             }),
         },
       }),
