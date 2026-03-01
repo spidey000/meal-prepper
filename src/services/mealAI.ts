@@ -1,7 +1,13 @@
+import { nanoid } from 'nanoid'
 import type {
+  DailyMenu,
   FamilyMember,
+  Ingredient,
   MealPlanConfig,
   MealPlanResponse,
+  MealSlotReference,
+  MealType,
+  PrepSession,
   Recipe,
   ShoppingList,
   WeeklyScheduleDay,
@@ -13,6 +19,57 @@ const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
 const DEFAULT_MODEL = 'openrouter/anthropic/claude-3.5-sonnet'
 const PROXY_URL = import.meta.env.VITE_AI_PROXY_URL
 const JSON_RESPONSE_FORMAT = { type: 'json_object' }
+
+const MEAL_SLOT_ORDER: MealType[] = [
+  'breakfast',
+  'morningSnack',
+  'lunch',
+  'afternoonSnack',
+  'dinner',
+]
+
+const MEAL_PLAN_JSON_SCHEMA = `{
+  "dailyMenus": [
+    {
+      "date": "2026-02-23",
+      "breakfast": { "name": "Greek Yogurt with Honey and Walnuts", "recipeId": "rm1" },
+      "morningSnack": null,
+      "lunch": { "name": "Mediterranean Quinoa Salad", "recipeId": "rm2" },
+      "afternoonSnack": null,
+      "dinner": { "name": "Baked Lemon Herb Salmon", "recipeId": "rm3" },
+      "prepSessions": [
+        {
+          "id": "prep-1",
+          "recipeId": "rm3",
+          "mealType": "dinner",
+          "start": "2026-02-23T16:00:00Z",
+          "end": "2026-02-23T17:00:00Z",
+          "notes": "Marinate salmon",
+          "isBatchCooking": false
+        }
+      ]
+    }
+  ],
+  "recipes": [
+    {
+      "id": "rm1",
+      "name": "Greek Yogurt with Honey and Walnuts",
+      "description": "Protein-rich breakfast",
+      "ingredients": [
+        { "item": "Plain Greek yogurt", "quantity": 1, "unit": "cup" },
+        { "item": "Honey", "quantity": 1, "unit": "tbsp" },
+        { "item": "Walnuts", "quantity": 0.25, "unit": "cup" }
+      ],
+      "instructions": "Combine ingredients and serve chilled.",
+      "prepTimeMinutes": 5,
+      "cookingTimeMinutes": 0,
+      "difficulty": "easy",
+      "nutritionalInfo": { "calories": 320, "protein": 20, "carbs": 28, "fat": 15 },
+      "servesPeople": 2,
+      "tags": ["breakfast", "protein"]
+    }
+  ]
+}`
 
 const responseFormatSupportedModels = new Set<string>()
 let responseFormatSupportStatus: 'idle' | 'loading' | 'loaded' | 'failed' = 'idle'
@@ -121,6 +178,25 @@ const shouldRequestJsonFormat = async ({
     return responseFormatSupportedModels.has(modelId)
   }
   return true
+}
+
+type RawRecipe = Partial<Recipe>
+
+interface RawDailyMenu {
+  date?: string
+  dayOfWeek?: string
+  meals?: Partial<Record<MealType, unknown>>
+  breakfast?: unknown
+  morningSnack?: unknown
+  lunch?: unknown
+  afternoonSnack?: unknown
+  dinner?: unknown
+  prepSessions?: PrepSession[]
+}
+
+interface RawMealPlanResponse {
+  dailyMenus?: RawDailyMenu[]
+  recipes?: RawRecipe[]
 }
 
 export interface BaseAIOptions {
@@ -299,11 +375,203 @@ function summarizeSchedule(schedule: WeeklyScheduleDay[]) {
   }))
 }
 
+interface RecipeIndex {
+  byId: Record<string, Recipe>
+  byName: Map<string, Recipe>
+}
+
+const normalizeMealPlanResponse = (raw: RawMealPlanResponse): MealPlanResponse => {
+  const recipes = sanitizeRecipes(raw.recipes)
+  const recipeIndex = buildRecipeIndex(recipes)
+  const dailyMenus = normalizeDailyMenus(raw.dailyMenus, recipeIndex)
+  return { dailyMenus, recipes }
+}
+
+const sanitizeRecipes = (recipes?: RawRecipe[]): Recipe[] => {
+  if (!Array.isArray(recipes)) return []
+  return recipes.map((recipe, index) => {
+    const id = getString(recipe?.id) ?? `recipe-${nanoid()}`
+    const name = getString(recipe?.name) ?? `Meal ${index + 1}`
+    const description = getString(recipe?.description)
+    const ingredients = sanitizeIngredients(recipe?.ingredients)
+    const instructions = getString(recipe?.instructions) ?? 'Follow the provided steps carefully.'
+    const prepTimeMinutes = typeof recipe?.prepTimeMinutes === 'number' ? recipe.prepTimeMinutes : 0
+    const cookingTimeMinutes =
+      typeof recipe?.cookingTimeMinutes === 'number' ? recipe.cookingTimeMinutes : 0
+    const difficulty: Recipe['difficulty'] =
+      recipe?.difficulty === 'easy' ||
+      recipe?.difficulty === 'medium' ||
+      recipe?.difficulty === 'hard'
+        ? recipe.difficulty
+        : 'easy'
+    const nutritionalInfo = sanitizeNutritionalInfo(recipe?.nutritionalInfo)
+    const servesPeople = typeof recipe?.servesPeople === 'number' ? recipe.servesPeople : 4
+    const tags = Array.isArray(recipe?.tags)
+      ? recipe.tags.filter((tag): tag is string => typeof tag === 'string')
+      : []
+
+    return {
+      id,
+      name,
+      description,
+      ingredients,
+      instructions,
+      prepTimeMinutes,
+      cookingTimeMinutes,
+      difficulty,
+      nutritionalInfo,
+      servesPeople,
+      tags,
+    }
+  })
+}
+
+const sanitizeIngredients = (raw: unknown): Ingredient[] => {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((ingredient) => {
+      if (!ingredient) return null
+      if (typeof ingredient === 'string') {
+        return { item: ingredient, quantity: 1, unit: '' }
+      }
+      if (typeof ingredient === 'object') {
+        const source = ingredient as Record<string, unknown>
+        const item = getString(source.item ?? source.name)
+        if (!item) return null
+        const quantity = typeof source.quantity === 'number' ? source.quantity : 1
+        const unit = getString(source.unit) ?? ''
+        return { item, quantity, unit }
+      }
+      return null
+    })
+    .filter((entry): entry is Ingredient => Boolean(entry))
+}
+
+const sanitizeNutritionalInfo = (raw: unknown): Recipe['nutritionalInfo'] => {
+  if (typeof raw === 'object' && raw !== null) {
+    const data = raw as Record<string, unknown>
+    return {
+      calories: typeof data.calories === 'number' ? data.calories : 0,
+      protein: typeof data.protein === 'number' ? data.protein : 0,
+      carbs: typeof data.carbs === 'number' ? data.carbs : 0,
+      fat: typeof data.fat === 'number' ? data.fat : 0,
+    }
+  }
+  return { calories: 0, protein: 0, carbs: 0, fat: 0 }
+}
+
+const buildRecipeIndex = (recipes: Recipe[]): RecipeIndex => {
+  const byId = recipes.reduce<Record<string, Recipe>>((acc, recipe) => {
+    acc[recipe.id] = recipe
+    return acc
+  }, {})
+  const byName = new Map<string, Recipe>(
+    recipes.map((recipe) => [recipe.name.toLowerCase(), recipe]),
+  )
+  return { byId, byName }
+}
+
+const normalizeDailyMenus = (
+  rawMenus: RawDailyMenu[] | undefined,
+  recipeIndex: RecipeIndex,
+): DailyMenu[] => {
+  if (!Array.isArray(rawMenus)) return []
+  return rawMenus.map((raw, index) => {
+    const date = getString(raw?.date) ?? fallbackDate(index)
+    const normalized: DailyMenu = {
+      date,
+      breakfast: null,
+      morningSnack: null,
+      lunch: null,
+      afternoonSnack: null,
+      dinner: null,
+    }
+
+    MEAL_SLOT_ORDER.forEach((slot) => {
+      const slotValue = (raw as Record<string, unknown>)?.[slot] ?? raw?.meals?.[slot]
+      normalized[slot] = sanitizeMealSlot(slotValue, recipeIndex)
+    })
+
+    if (Array.isArray(raw?.prepSessions) && raw.prepSessions.length > 0) {
+      normalized.prepSessions = raw.prepSessions as PrepSession[]
+    }
+
+    return normalized
+  })
+}
+
+const sanitizeMealSlot = (value: unknown, recipeIndex: RecipeIndex): MealSlotReference | null => {
+  if (!value) return null
+  if (typeof value === 'string') {
+    return resolveSlotFromString(value, recipeIndex)
+  }
+  if (typeof value === 'object') {
+    const source = value as Record<string, unknown>
+    const recipeId =
+      getString(source.recipeId) ??
+      getString(source.id) ??
+      getString(source.mealId) ??
+      (typeof source.recipe === 'object' && source.recipe
+        ? getString((source.recipe as Record<string, unknown>).id)
+        : undefined)
+    const name =
+      getString(source.name) ??
+      getString(source.title) ??
+      getString(source.label) ??
+      (typeof source.recipe === 'object' && source.recipe
+        ? getString((source.recipe as Record<string, unknown>).name)
+        : undefined)
+
+    if (recipeId) {
+      const recipe = recipeIndex.byId[recipeId]
+      return {
+        name: name ?? recipe?.name ?? recipeId,
+        recipeId,
+      }
+    }
+
+    if (name) {
+      const known = recipeIndex.byName.get(name.toLowerCase())
+      return {
+        name,
+        recipeId: known?.id ?? null,
+      }
+    }
+  }
+  return null
+}
+
+const resolveSlotFromString = (
+  value: string,
+  recipeIndex: RecipeIndex,
+): MealSlotReference | null => {
+  const cleaned = value.trim()
+  if (!cleaned) return null
+  const recipe = recipeIndex.byId[cleaned]
+  if (recipe) {
+    return { name: recipe.name, recipeId: recipe.id }
+  }
+  const known = recipeIndex.byName.get(cleaned.toLowerCase())
+  if (known) {
+    return { name: known.name, recipeId: known.id }
+  }
+  return { name: cleaned, recipeId: null }
+}
+
+const getString = (value: unknown) =>
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+
+const fallbackDate = (offset: number) => {
+  const base = new Date()
+  base.setDate(base.getDate() + offset)
+  return base.toISOString().split('T')[0]
+}
+
 export async function generateMealPlan(
   config: MealPlanConfig,
   options: BaseAIOptions,
 ): Promise<MealPlanResponse> {
-  const prompt = `You are an experienced family nutritionist. Build a 7 day menu for the household.
+  const prompt = `You are an experienced family nutritionist. Build a 7 day menu for the household using STRICT JSON only.
 Family members: ${JSON.stringify(summarizeFamily(config.members))}
 Weekly schedule availability: ${JSON.stringify(summarizeSchedule(config.schedule))}
 Meal types requested: ${JSON.stringify(config.settings.mealTypes)}
@@ -311,16 +579,21 @@ Preferred cuisines: ${JSON.stringify(config.settings.preferredCuisines)}
 Default meal times: ${JSON.stringify(config.settings.defaultMealTimes)}
 Default cook time caps: ${JSON.stringify(config.settings.defaultMaxCookingMinutes)}
 
-Return strict JSON with shape {"dailyMenus": DailyMenu[], "recipes": Recipe[]}.
+Your response MUST match this schema exactly. Every meal slot must be either null or an object with "name" and "recipeId" referring to a recipe in the recipes array. IDs must be consistent across the document.
+\n\n\`\`\`json
+${MEAL_PLAN_JSON_SCHEMA}
+\`\`\`
+
 Recipe ingredients must include quantity and unit. Use freeBlocks to schedule prep and treat days with isBatchCookingDay=true as long, scalable cook sessions with leftovers.`
 
-  return callAI<MealPlanResponse>({
+  const rawResponse = await callAI<RawMealPlanResponse>({
     messages: [
       { role: 'system', content: 'You generate structured meal plans and recipes for families.' },
       { role: 'user', content: prompt },
     ],
     ...options,
   })
+  return normalizeMealPlanResponse(rawResponse)
 }
 
 export async function regenerateMeal(
