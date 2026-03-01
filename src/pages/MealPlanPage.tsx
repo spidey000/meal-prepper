@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { Sparkles } from 'lucide-react'
-import { useAppStore } from '../store/appStore'
+import { useAppStore, defaultAppPreferences } from '../store/appStore'
 import { SectionHeader } from '../components/SectionHeader'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { generateMealPlan, regenerateMeal, generateShoppingList } from '../services/mealAI'
-import type { MealType } from '../types/app'
+import type { DailyMenu, MealPlanResponse, MealType, Recipe, ShoppingList } from '../types/app'
 
 const mealLabels: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -15,11 +15,13 @@ const mealLabels: Record<MealType, string> = {
   afternoonSnack: 'Afternoon snack',
   dinner: 'Dinner',
 }
+const supportedMealTypes = Object.keys(mealLabels) as MealType[]
 
 export const MealPlanPage = () => {
   const { family, schedule, dailyMenus, recipes, settings, guestApiKey, actions, isGenerating, shoppingList, lastGeneratedAt } = useAppStore()
   const [weekStart, setWeekStart] = useState(schedule[0]?.date ?? new Date().toISOString().split('T')[0])
   const canGenerate = family.length > 0 && !!(settings.apiKey ?? guestApiKey ?? import.meta.env.VITE_OPENROUTER_API_KEY)
+  const appPreferences = settings.appPreferences ?? defaultAppPreferences
 
   const orderedMenus = useMemo(() =>
     [...dailyMenus].sort((a, b) => a.date.localeCompare(b.date)), [dailyMenus])
@@ -36,6 +38,9 @@ export const MealPlanPage = () => {
       }
       const plan = await generateMealPlan(config, { apiKey: settings.apiKey ?? guestApiKey, model: settings.aiModel })
       actions.setMealPlan(plan)
+      if (appPreferences.autoBuildShoppingList) {
+        await buildShoppingListFromPlan(plan, weekStart, settings.apiKey ?? guestApiKey, settings.aiModel, actions.setShoppingList)
+      }
     } catch (error) {
       console.error(error)
       alert('AI generation failed. Check your API key and try again.')
@@ -70,17 +75,16 @@ export const MealPlanPage = () => {
   }
 
   const handleShoppingList = async () => {
-    const recipeList = orderedMenus
-      .flatMap((menu) => Object.values(menu))
-      .filter((slot): slot is { name: string; recipeId: string } => Boolean(slot && slot.recipeId))
-      .map((slot) => recipes[slot.recipeId!])
-      .filter(Boolean)
+    const recipeList = collectRecipesFromMenus(orderedMenus, recipes)
     if (recipeList.length === 0) {
       alert('Generate a meal plan first.')
       return
     }
     try {
-      const list = await generateShoppingList({ recipes: recipeList, weekStartDate: weekStart }, { apiKey: settings.apiKey ?? guestApiKey, model: settings.aiModel })
+      const list = await generateShoppingList(
+        { recipes: recipeList, weekStartDate: weekStart },
+        { apiKey: settings.apiKey ?? guestApiKey, model: settings.aiModel },
+      )
       actions.setShoppingList(list)
     } catch (error) {
       console.error(error)
@@ -147,13 +151,31 @@ export const MealPlanPage = () => {
                       </Button>
                     </div>
                     {recipe && (
-                      <ul className="mt-3 text-xs text-slate-600">
-                        {recipe.ingredients.slice(0, 3).map((ingredient) => (
-                          <li key={ingredient.item}>
-                            {ingredient.quantity} {ingredient.unit} {ingredient.item}
-                          </li>
-                        ))}
-                      </ul>
+                      <>
+                        <ul className="mt-3 text-xs text-slate-600">
+                          {recipe.ingredients.slice(0, 3).map((ingredient) => (
+                            <li key={ingredient.item}>
+                              {ingredient.quantity} {ingredient.unit} {ingredient.item}
+                            </li>
+                          ))}
+                        </ul>
+                        {appPreferences.showNutritionalInfo && (
+                          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                            <span className="rounded-full bg-white px-2 py-0.5 shadow-sm">
+                              {recipe.nutritionalInfo.calories} kcal
+                            </span>
+                            <span className="rounded-full bg-white px-2 py-0.5 shadow-sm">
+                              P {recipe.nutritionalInfo.protein} g
+                            </span>
+                            <span className="rounded-full bg-white px-2 py-0.5 shadow-sm">
+                              C {recipe.nutritionalInfo.carbs} g
+                            </span>
+                            <span className="rounded-full bg-white px-2 py-0.5 shadow-sm">
+                              F {recipe.nutritionalInfo.fat} g
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )
@@ -174,4 +196,40 @@ export const MealPlanPage = () => {
       </div>
     </div>
   )
+}
+
+const collectRecipesFromMenus = (menus: DailyMenu[], recipeMap: Record<string, Recipe>) => {
+  const result: Recipe[] = []
+  supportedMealTypes.forEach((mealType) => {
+    menus.forEach((menu) => {
+      const slot = menu[mealType]
+      if (slot?.recipeId) {
+        const recipe = recipeMap[slot.recipeId]
+        if (recipe) result.push(recipe)
+      }
+    })
+  })
+  return result
+}
+
+const buildShoppingListFromPlan = async (
+  plan: MealPlanResponse,
+  weekStart: string,
+  apiKey: string | undefined,
+  model: string,
+  setShoppingList: (list: ShoppingList) => void,
+) => {
+  const map = plan.recipes.reduce<Record<string, Recipe>>((acc, recipe) => {
+    acc[recipe.id] = recipe
+    return acc
+  }, {})
+  const recipeList = collectRecipesFromMenus(plan.dailyMenus, map)
+  if (recipeList.length === 0) return
+  try {
+    const list = await generateShoppingList({ recipes: recipeList, weekStartDate: weekStart }, { apiKey, model })
+    setShoppingList(list)
+  } catch (error) {
+    console.error('Auto shopping list failed', error)
+    alert('Meal plan ready, but auto shopping list failed. Use the button to try again.')
+  }
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useAppStore } from '../store/appStore'
+import { useAppStore, defaultAppPreferences } from '../store/appStore'
 import { useAuth } from '../app/auth/useAuth'
 import { SectionHeader } from '../components/SectionHeader'
 import { Card } from '../components/ui/Card'
@@ -19,12 +19,6 @@ const sections = [
 ] as const
 
 type SettingsSection = (typeof sections)[number]['id']
-
-const fallbackAppPreferences: AppPreferences = {
-  compactMode: false,
-  showNutritionalInfo: true,
-  autoBuildShoppingList: true,
-}
 
 export const SettingsPage = () => {
   const { settings, actions, guestApiKey } = useAppStore()
@@ -52,7 +46,7 @@ export const SettingsPage = () => {
     [modelsData, modelSearch, showFreeOnly],
   )
   const calendarSync = settings.calendarSync ?? { provider: 'google', connected: false, autoPushEvents: false }
-  const appPreferences = settings.appPreferences ?? fallbackAppPreferences
+  const appPreferences = settings.appPreferences ?? defaultAppPreferences
 
   const toggleMealType = (mealType: MealType) => {
     const active = new Set(settings.mealTypes)

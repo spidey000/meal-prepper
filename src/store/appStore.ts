@@ -16,6 +16,12 @@ import { profileStorage } from './profileStorage'
 
 const defaultMealTypes: MealType[] = ['breakfast', 'lunch', 'dinner']
 
+export const defaultAppPreferences = {
+  compactMode: false,
+  showNutritionalInfo: true,
+  autoBuildShoppingList: true,
+}
+
 const defaultSettings: UserSettings = {
   preferredCuisines: ['mediterranean', 'italian', 'mexican'],
   mealTypes: defaultMealTypes,
@@ -40,11 +46,7 @@ const defaultSettings: UserSettings = {
     connected: false,
     autoPushEvents: false,
   },
-  appPreferences: {
-    compactMode: false,
-    showNutritionalInfo: true,
-    autoBuildShoppingList: true,
-  },
+  appPreferences: defaultAppPreferences,
 }
 
 export interface AppState {
