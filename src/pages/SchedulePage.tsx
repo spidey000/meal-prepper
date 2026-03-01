@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { nanoid } from 'nanoid'
-import { CalendarDays } from 'lucide-react'
+import { AlertCircle, CalendarDays, RefreshCcw } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import { SectionHeader } from '../components/SectionHeader'
 import { Card } from '../components/ui/Card'
@@ -8,18 +8,41 @@ import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Button } from '../components/ui/Button'
 import { parseScheduleFromText } from '../services/mealAI'
+import { fetchCalendarWeek } from '../services/calendar'
 
 export const SchedulePage = () => {
-  const { schedule, family, actions, settings, guestApiKey } = useAppStore()
+  const { schedule, family, actions, settings, guestApiKey, lastCalendarSync } = useAppStore()
   const [selectedDayId, setSelectedDayId] = useState(schedule[0]?.id ?? '')
   const [textInput, setTextInput] = useState('')
   const [isParsing, setIsParsing] = useState(false)
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [eventDrafts, setEventDrafts] = useState<Record<string, { summary: string; start: string; end: string }>>({})
 
   const selectedDay = useMemo(
     () => schedule.find((day) => day.id === selectedDayId) ?? schedule[0],
     [schedule, selectedDayId],
   )
+  const calendarSync = settings.calendarSync
+  const isCalendarConnected = calendarSync?.connected ?? false
+  const lastSyncDisplay = lastCalendarSync ? new Date(lastCalendarSync).toLocaleString() : 'Never'
+  const selectedFreeBlocks = selectedDay?.freeBlocks ?? []
+  const isBatchCookingDay = selectedDay?.isBatchCookingDay ?? false
+
+  const formatTimeValue = (value: string) => {
+    if (!value) return ''
+    if (value.includes('T')) {
+      const parsed = new Date(value)
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    }
+    return value
+  }
+
+  const formatFreeBlock = (start: string, end: string) => `${formatTimeValue(start)} → ${formatTimeValue(end)}`
+
+  const weekStart = schedule[0]?.date ?? new Date().toISOString().split('T')[0]
 
   const updateAvailability = (field: 'lunchMinutes' | 'dinnerMinutes', value: number) => {
     if (!selectedDay) return
@@ -41,6 +64,11 @@ export const SchedulePage = () => {
     })
   }
 
+  const toggleBatchCookingDay = () => {
+    if (!selectedDay) return
+    actions.toggleBatchCookingDay(selectedDay.id)
+  }
+
   const handleAddEvent = (dayId: string) => {
     const day = schedule.find((d) => d.id === dayId)
     if (!day) return
@@ -54,7 +82,21 @@ export const SchedulePage = () => {
     setEventDrafts((prev) => ({ ...prev, [dayId]: { summary: '', start: '', end: '' } }))
   }
 
-  const weekStart = schedule[0]?.date ?? new Date().toISOString().split('T')[0]
+  const handleImportCalendar = async () => {
+    if (!isCalendarConnected) return
+    try {
+      setSyncError(null)
+      setIsSyncingCalendar(true)
+      const { days, lastSyncedAt } = await fetchCalendarWeek(weekStart)
+      actions.applyCalendarImport(days)
+      actions.setLastCalendarSync(lastSyncedAt ?? new Date().toISOString())
+    } catch (error) {
+      console.error(error)
+      setSyncError(error instanceof Error ? error.message : 'Unable to sync Google Calendar.')
+    } finally {
+      setIsSyncingCalendar(false)
+    }
+  }
 
   const handleParseText = async () => {
     if (!textInput.trim()) return
@@ -143,6 +185,34 @@ export const SchedulePage = () => {
                       {selectedDay.availability.dinnerMinutes} min
                     </span>
                   </label>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-600">Batch cooking day</p>
+                      <p className="text-xs text-slate-500">Scale recipes and cook ahead when time allows.</p>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                      <input type="checkbox" checked={isBatchCookingDay} onChange={toggleBatchCookingDay} />
+                      {isBatchCookingDay ? 'On' : 'Off'}
+                    </label>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-medium text-slate-600">Imported free windows</p>
+                  {selectedFreeBlocks.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                      {selectedFreeBlocks.map((block, index) => (
+                        <li key={`${block.start}-${block.end}-${index}`} className="flex items-center justify-between">
+                          <span>{formatFreeBlock(block.start, block.end)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-xs text-slate-500">Sync Google Calendar to detect open prep time.</p>
+                  )}
                 </div>
               </div>
               <div>
@@ -245,25 +315,64 @@ export const SchedulePage = () => {
             </div>
           )}
         </Card>
-        <Card>
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <CalendarDays className="h-4 w-4" /> Quick text import
-          </div>
-          <p className="mt-2 text-sm text-slate-500">
-            Paste your schedule ("Mon 8:00 school drop-off") and let the AI convert it into structured availability.
-          </p>
-          <Textarea
-            rows={12}
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Mon 8:00-16:00 Work for Lucia
+        <div className="space-y-6">
+          <Card>
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <RefreshCcw className="h-4 w-4" /> Google Calendar sync
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Pull your busy/free windows from Google Calendar so recipe durations adjust automatically.
+            </p>
+            <dl className="mt-4 space-y-2 text-sm text-slate-600">
+              <div className="flex items-center justify-between">
+                <dt>Status</dt>
+                <dd className={`font-medium ${isCalendarConnected ? 'text-green-600' : 'text-orange-600'}`}>
+                  {isCalendarConnected ? 'Connected to Google' : 'Not connected'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt>Last sync</dt>
+                <dd>{lastSyncDisplay}</dd>
+              </div>
+            </dl>
+            <Button
+              className="mt-4 w-full"
+              onClick={handleImportCalendar}
+              disabled={!isCalendarConnected || isSyncingCalendar}
+            >
+              {isSyncingCalendar ? 'Syncing calendar…' : 'Import calendar week'}
+            </Button>
+            {!isCalendarConnected && (
+              <p className="mt-2 text-xs text-orange-600">
+                Connect through Settings → Calendar sync before importing events.
+              </p>
+            )}
+            {syncError && (
+              <p className="mt-2 flex items-center gap-2 text-xs text-red-600">
+                <AlertCircle className="h-4 w-4" /> {syncError}
+              </p>
+            )}
+          </Card>
+          <Card>
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <CalendarDays className="h-4 w-4" /> Quick text import
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Paste your schedule ("Mon 8:00 school drop-off") and let the AI convert it into structured availability.
+            </p>
+            <Textarea
+              rows={12}
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              placeholder="Mon 8:00-16:00 Work for Lucia
 Tue 15:00-18:00 Soccer practice for Max"
-            className="mt-4"
-          />
-          <Button className="mt-4 w-full" onClick={handleParseText} disabled={isParsing || !textInput.trim()}>
-            {isParsing ? 'Parsing schedule…' : 'Parse schedule text'}
-          </Button>
-        </Card>
+              className="mt-4"
+            />
+            <Button className="mt-4 w-full" onClick={handleParseText} disabled={isParsing || !textInput.trim()}>
+              {isParsing ? 'Parsing schedule…' : 'Parse schedule text'}
+            </Button>
+          </Card>
+        </div>
       </div>
     </div>
   )

@@ -1,7 +1,9 @@
 import { forwardRef } from 'react'
+import type { InputHTMLAttributes } from 'react'
 import { twMerge } from 'tailwind-merge'
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+type InputProps = InputHTMLAttributes<HTMLInputElement>
+
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, ...props }, ref) => (
   <input

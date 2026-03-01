@@ -89,6 +89,9 @@ function summarizeSchedule(schedule: WeeklyScheduleDay[]) {
     dayOfWeek: day.dayOfWeek,
     availability: day.availability,
     diners: day.diners,
+    freeBlocks: day.freeBlocks ?? [],
+    calendarSource: day.calendarSource ?? 'manual',
+    isBatchCookingDay: day.isBatchCookingDay ?? false,
   }))
 }
 
@@ -105,7 +108,7 @@ Default meal times: ${JSON.stringify(config.settings.defaultMealTimes)}
 Default cook time caps: ${JSON.stringify(config.settings.defaultMaxCookingMinutes)}
 
 Return strict JSON with shape {"dailyMenus": DailyMenu[], "recipes": Recipe[]}.
-Recipe ingredients must include quantity and unit. Encourage batch cooking on days with high availability.`
+Recipe ingredients must include quantity and unit. Use freeBlocks to schedule prep and treat days with isBatchCookingDay=true as long, scalable cook sessions with leftovers.`
 
   return callAI<MealPlanResponse>({
     messages: [

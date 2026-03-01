@@ -87,7 +87,8 @@ export const FamilyPage = () => {
     if (editing) {
       actions.updateMember(payload)
     } else {
-      const { id: _discard, ...rest } = payload
+      const { id: _omit, ...rest } = payload
+      void _omit
       actions.addMember(rest)
     }
     setEditing(null)

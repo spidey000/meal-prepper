@@ -21,21 +21,20 @@ Legend:
 2. [x] Introduce design system (Tailwind, tokens, typography, spacing scale, light/dark palettes).
 3. [x] Configure React Router with authenticated + guest layouts, navigation shell, toasts, loading/skeleton states.
 4. [x] Add state/query tooling (React Query + Zustand or equivalent) and provider composition.
-5. [x] Configure environment handling (`.env`, `.env.example`, `vite-env.d.ts`), expose Netlify/Supabase vars safely.
+5. [x] Configure environment handling (`.env`, `.env.example`, `vite-env.d.ts`) for OpenRouter + local profile storage toggles.
 6. [x] Implement global error boundary and fallback UI.
 
-## Phase 2 – Supabase & Auth (Days 2-4)
-1. [ ] Provision Supabase project; enable Google OAuth + email magic links.
-2. [ ] Author SQL schema & migrations for: `family_members`, `weekly_schedules`, `availability`, `recipes`, `daily_menus`, `shopping_lists`, `user_settings`, `ai_logs`.
-3. [ ] Define RLS policies per table; ensure per-user isolation.
-4. [ ] Implement Supabase client module, session context, auth hooks, and profile bootstrap logic.
-5. [ ] Build onboarding flow to capture household defaults immediately after sign-in.
+## Phase 2 – Local Profiles & Persistence (Days 2-4)
+1. [ ] Build username-based onboarding that lets users create/select a local profile before entering the app.
+2. [ ] Persist every profile's family, schedule, recipes, and settings via isolated localStorage buckets.
+3. [ ] Provide profile management UI (rename/delete/reset) and ensure switching hydrates the correct data.
+4. [ ] Document the local-only flow plus recommended backup/export reminders.
 
-## Phase 3 – Guest Mode & Local Persistence (Days 3-4)
-1. [ ] Create local storage/IndexedDB strategy for guests (e.g., Zustand persist) covering family, schedule, settings, recipes.
-2. [ ] Implement OpenRouter API key storage rules (Supabase encrypted column vs browser storage for guests).
-3. [ ] Provide guest-to-auth migration path to merge local data into Supabase on sign-in.
-4. [ ] Add clear warning/CTA gating AI features until an API key is provided in guest mode.
+## Phase 3 – Guest Mode Enhancements (Days 3-4)
+1. [ ] Allow continuing as a temporary guest profile with a prominent CTA to save progress under a username.
+2. [ ] Implement OpenRouter API key storage rules for local mode (per profile, optional encryption).
+3. [ ] Provide guidance for exporting/importing profile data for manual backups.
+4. [ ] Add clear warning/CTA gating AI features until an API key is provided in the active profile.
 
 ## Phase 4 – Family Profiles (Days 4-5)
 1. [ ] Build CRUD UI for members, including allergies, dietary preferences, activity level, school/work schedule, and notes.
@@ -47,12 +46,15 @@ Legend:
 1. [ ] Implement weekly calendar grid with manual availability sliders for lunch/dinner.
 2. [ ] Integrate Google Calendar sync (OAuth), ICS upload, and manual entry merging.
 3. [ ] Build AI-assisted ingestion flows: text parser and screenshot parser (OpenRouter vision models) producing structured schedule JSON.
-4. [ ] Calculate daily availability (minutes per meal) and store in Supabase/local store.
+4. [ ] Calculate daily availability (minutes per meal) and persist per profile in local storage.
+5. [ ] Auto-detect Google Calendar free/busy windows, annotate daily `freeBlocks`, and flag imported sources.
+6. [ ] Add UI toggles + persistence for marking batch cooking days and adjusting availability caps.
+7. [ ] Push accepted meal prep/batch sessions back to Google Calendar and store sync metadata.
 
 ## Phase 6 – AI Meal Planning & Recipes (Days 6-8)
 1. [ ] Implement `MealAIService` abstraction supporting tasks: `planWeek`, `regenerateMeal`, `shoppingList`, `parseScheduleText`, `parseScheduleImage`.
 2. [ ] Configure OpenRouter client (base URL, headers `HTTP-Referer`, `X-Title`), expose model selection.
-3. [ ] Build Netlify serverless functions proxying OpenRouter for authenticated users (pull API key from Supabase, enforce quotas/logging).
+3. [ ] Build Netlify serverless functions proxying OpenRouter for browser clients (pull API key from server-side secret, enforce quotas/logging).
 4. [ ] Implement client-side call path for guests (direct fetch using their key, with retry + JSON validation).
 5. [ ] Create UI to generate a weekly plan, show progress indicator, and allow regenerating individual meals while preserving context.
 6. [ ] Persist generated recipes + daily menus; enable manual edits and acceptance tracking.
@@ -73,16 +75,16 @@ Legend:
 2. [ ] Record AI contract tests ensuring JSON schema compliance (zod validation + mock responses).
 3. [ ] Configure Playwright smoke flows (auth, guest mode, meal plan generation, shopping list).
 4. [ ] Set up lint/format/test steps in CI (GitHub Actions or Netlify).
-5. [ ] Configure Netlify build pipeline, environment variables, Supabase keys, and preview deployments.
-6. [ ] Add monitoring/logging for Netlify functions + Supabase (Edge Functions logs, Sentry optional).
+5. [ ] Configure Netlify build pipeline, environment variables, OpenRouter keys, and preview deployments.
+6. [ ] Add monitoring/logging for Netlify functions (Edge Functions logs, Sentry optional).
 
 ## Phase 10 – Documentation & Handoff
 1. [ ] Rewrite README with stack overview, env setup, run/build/test scripts, deployment steps, and troubleshooting.
-2. [ ] Document Supabase schema, RLS policies, and local dev instructions (SQL files, migrations).
+2. [ ] Document local profile storage format, backup instructions, and any optional server components.
 3. [ ] Capture AI prompt templates + best practices for future tuning.
 4. [ ] Provide release checklist and future work backlog.
 
 ## Next Immediate Actions
 1. ✅ Re-run `npm install` to create `package-lock.json`, then stage scaffold files.
 2. ✅ Commit/push baseline scaffold before large changes.
-3. ▶ Begin Phase 2 work: Supabase auth wiring + schema migrations.
+3. ▶ Begin Phase 2 work: local profile onboarding + storage refactor.

@@ -1,7 +1,9 @@
 import { forwardRef } from 'react'
+import type { SelectHTMLAttributes } from 'react'
 import { twMerge } from 'tailwind-merge'
 
-export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {}
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement>
+
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(({ className, children, ...props }, ref) => (
   <select

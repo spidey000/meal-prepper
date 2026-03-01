@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAppStore } from '../store/appStore'
-import { useAuth } from '../app/auth/AuthProvider'
+import { useAuth } from '../app/auth/useAuth'
 import { SectionHeader } from '../components/SectionHeader'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'

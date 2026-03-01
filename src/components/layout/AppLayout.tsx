@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { Users, CalendarDays, Utensils, ShoppingBag, Settings, Sparkles } from 'lucide-react'
-import { useAuth } from '../../app/auth/AuthProvider'
+import { useAuth } from '../../app/auth/useAuth'
 import { Button } from '../ui/Button'
 
 const navItems = [
@@ -12,7 +12,22 @@ const navItems = [
 ]
 
 export const AppLayout = () => {
-  const { mode, status, user, signInWithGoogle, signOut } = useAuth()
+  const { status, profile, profiles, createProfile, selectProfile, signOut } = useAuth()
+
+  const handleCreateProfile = () => {
+    const label = typeof window !== 'undefined' ? window.prompt('Choose a local username') : null
+    if (label) {
+      createProfile(label)
+    }
+  }
+
+  const handleSelectProfile = (value: string) => {
+    if (value === 'guest') {
+      signOut()
+      return
+    }
+    selectProfile(value)
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -46,16 +61,29 @@ export const AppLayout = () => {
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-400">Current workspace</p>
-            <p className="text-sm font-medium text-slate-700">{mode === 'guest' ? 'Guest Mode' : user?.email}</p>
+            <p className="text-sm font-medium text-slate-700">{profile ? profile.label : 'Guest mode'}</p>
+            {status === 'loading' && <p className="text-xs text-slate-400">Loading profiles…</p>}
           </div>
-          <div className="flex items-center gap-3">
-            {mode === 'guest' ? (
-              <Button variant="secondary" onClick={signInWithGoogle} disabled={status === 'loading'}>
-                Sign in with Google
-              </Button>
-            ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+              value={profile?.id ?? 'guest'}
+              onChange={(event) => handleSelectProfile(event.target.value)}
+              disabled={status === 'loading'}
+            >
+              <option value="guest">Guest workspace</option>
+              {profiles.map((record) => (
+                <option key={record.id} value={record.id}>
+                  {record.label}
+                </option>
+              ))}
+            </select>
+            <Button variant="secondary" onClick={handleCreateProfile} disabled={status === 'loading'}>
+              New profile
+            </Button>
+            {profile && (
               <Button variant="ghost" onClick={signOut}>
-                Sign out
+                Switch to guest
               </Button>
             )}
           </div>

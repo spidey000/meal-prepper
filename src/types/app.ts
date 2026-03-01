@@ -25,6 +25,13 @@ export interface ScheduleEvent {
   end: string
 }
 
+export type CalendarSource = 'manual' | 'google' | 'ics'
+
+export interface FreeBlock {
+  start: string
+  end: string
+}
+
 export interface MealAvailability {
   lunchMinutes: number
   dinnerMinutes: number
@@ -36,6 +43,9 @@ export interface WeeklyScheduleDay {
   dayOfWeek: string
   events: ScheduleEvent[]
   availability: MealAvailability
+  freeBlocks?: FreeBlock[]
+  calendarSource?: CalendarSource
+  isBatchCookingDay?: boolean
   diners: {
     lunch: string[]
     dinner: string[]
@@ -72,6 +82,16 @@ export interface MealSlotReference {
   recipeId: string | null
 }
 
+export interface PrepSession {
+  id: string
+  recipeId: string
+  mealType: MealType
+  start: string
+  end: string
+  notes?: string
+  isBatchCooking?: boolean
+}
+
 export interface DailyMenu {
   date: string
   breakfast: MealSlotReference | null
@@ -79,6 +99,7 @@ export interface DailyMenu {
   lunch: MealSlotReference | null
   afternoonSnack: MealSlotReference | null
   dinner: MealSlotReference | null
+  prepSessions?: PrepSession[]
 }
 
 export interface ShoppingListItem {
@@ -101,6 +122,15 @@ export interface ShoppingList {
   estimatedTotalCost?: number
 }
 
+export interface CalendarSyncSettings {
+  provider: 'google'
+  connected: boolean
+  calendarId?: string
+  calendarEmail?: string
+  autoPushEvents: boolean
+  lastSyncedAt?: string
+}
+
 export interface UserSettings {
   preferredCuisines: string[]
   mealTypes: MealType[]
@@ -109,6 +139,7 @@ export interface UserSettings {
   aiModel: string
   apiProvider: 'openrouter'
   apiKey?: string
+  calendarSync?: CalendarSyncSettings
 }
 
 export interface MealPlanConfig {

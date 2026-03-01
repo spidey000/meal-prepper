@@ -1,13 +1,13 @@
 # AI Family Meal Planner
 
-An opinionated Vite + React + TypeScript application that automates family meal planning, recipe generation, and grocery lists using OpenRouter-powered AI. Authenticated users can sync their data with Supabase, while guests keep everything in local storage.
+An opinionated Vite + React + TypeScript application that automates family meal planning, recipe generation, and grocery lists using OpenRouter-powered AI. Everything runs locally in the browser under a username you choose—no remote accounts or Supabase project required.
 
 ## Tech stack
 
 - **Frontend**: React 19, React Router 7, TailwindCSS 3, Zustand, React Query
-- **Backend services**: Supabase (Auth + Postgres) and Netlify Functions (AI proxy hooks)
+- **Local persistence**: Browser storage powered by Zustand profiles keyed by username
 - **AI provider**: [OpenRouter](https://openrouter.ai) with Claude 3.5 Sonnet as the default model
-- **State persistence**: Local storage for guest mode, Supabase tables for authenticated mode (family, schedules, recipes, shopping lists, settings)
+- **Optional backend**: Netlify Functions (AI proxy hooks) when you don't want to expose API keys to the client
 
 ## Getting started
 
@@ -34,22 +34,7 @@ Netlify Functions expect:
 
 ```
 OPENROUTER_API_KEY= # service key used when user keys are stored server-side
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_AI_KEYS_TABLE=ai_api_keys
 ```
-
-### Supabase schema outline
-
-- `family_members`
-- `weekly_schedules`
-- `recipes`
-- `daily_menus`
-- `shopping_lists`
-- `user_settings` (stores encrypted OpenRouter keys + cuisine prefs)
-- `ai_api_keys` (optional table used by Netlify Functions)
-
-Each table should enforce RLS with policies that scope rows to `auth.uid()`.
 
 ## Available scripts
 
@@ -85,9 +70,8 @@ All AI calls run through `src/services/mealAI.ts`. You can swap models or provid
 ## Deployment checklist
 
 1. Push main to GitHub so Netlify can build automatically
-2. Configure Netlify environment variables (OpenRouter + Supabase)
-3. Expose Supabase URL + anon key to the frontend via Vite env vars
-4. Enable Netlify Functions directory (`netlify/functions`)
-5. Point your domain (Netlify + Cloudflare) and enable HTTPS
+2. Configure Netlify environment variables (OpenRouter + any custom function secrets)
+3. Enable Netlify Functions directory (`netlify/functions`) if you proxy AI calls
+4. Point your domain (Netlify + Cloudflare) and enable HTTPS
 
 Happy cooking!

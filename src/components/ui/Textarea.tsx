@@ -1,7 +1,9 @@
 import { forwardRef } from 'react'
+import type { TextareaHTMLAttributes } from 'react'
 import { twMerge } from 'tailwind-merge'
 
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>
+
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => (
   <textarea
