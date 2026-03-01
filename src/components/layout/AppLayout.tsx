@@ -44,7 +44,9 @@ export const AppLayout = () => {
   // Cerrar sidebar móvil al cambiar ruta
   useEffect(() => {
     setSidebarMobileOpen(false)
-  }, [location.pathname, setSidebarMobileOpen])
+    // Solo dependency: location.pathname cambia cuando la ruta cambia
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
 
   const handleCreateProfile = () => {
     const label = typeof window !== 'undefined' ? window.prompt('Choose a local username') : null
