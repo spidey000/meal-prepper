@@ -67,6 +67,39 @@ netlify/functions/    # Serverless AI proxy endpoints (to be implemented)
 
 All AI calls run through `src/services/mealAI.ts`. You can swap models or providers in one place.
 
+
+## AI debug logging
+
+The app now includes structured, verbose AI logging in `src/services/aiDebug.ts` and integrates it across AI call flows in `src/services/mealAI.ts` and model discovery in `src/services/openrouter.ts`.
+
+### Toggle verbose logs
+
+You can control browser-console verbosity with either option below (first match wins):
+
+1. `VITE_AI_VERBOSE_LOGGING=true|false`
+2. Runtime override: `localStorage.setItem('ai:debug:verbose', 'true')` (or `'false'`)
+3. Default fallback: enabled in `import.meta.env.DEV`, disabled in production
+
+### Log categories and format
+
+Logs are emitted with ISO timestamps and a consistent prefix:
+
+- `[AI Call]` request + response payload/status
+- `[AI Performance]` duration metrics for each AI request
+- `[AI Error]` severity (`INFO`, `WARN`, `ERROR`), source function, message, and stack when available
+- `[AI Config]` model/provider settings and JSON-response capability snapshots
+
+Example output shape:
+
+```text
+2026-01-01T00:00:00.000Z [AI Call] [INFO] [Function: callAI.openrouter] Request Sent {...}
+2026-01-01T00:00:00.150Z [AI Call] [INFO] [Function: callAI.openrouter] Response Received: status=200 duration=150.20ms {...}
+2026-01-01T00:00:00.151Z [AI Performance] [INFO] [Function: callAI.openrouter] Request Processing Time: 150.20ms
+2026-01-01T00:00:00.152Z [AI Config] [INFO] [Function: MealPlanPage.init] Configuration snapshot {...}
+```
+
+AI configuration snapshots are logged on Meal Plan initialization and whenever relevant AI settings are updated.
+
 ## Deployment checklist
 
 1. Push main to GitHub so Netlify can build automatically

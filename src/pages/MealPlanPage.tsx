@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { Sparkles } from 'lucide-react'
 import { useAppStore, defaultAppPreferences } from '../store/appStore'
@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { ModelSummary } from '../components/ModelSummary'
 import { generateMealPlan, regenerateMeal, generateShoppingList } from '../services/mealAI'
+import { aiDebug, createAIConfigSnapshot } from '../services/aiDebug'
 import type { BaseAIOptions } from '../services/mealAI'
 import type { DailyMenu, MealPlanResponse, MealType, Recipe, ShoppingList } from '../types/app'
 
@@ -46,6 +47,20 @@ export const MealPlanPage = () => {
     modelLabel: modelMetadata?.label,
     supportsJsonResponse: modelMetadata?.supportsJsonResponse,
   }
+
+
+  useEffect(() => {
+    aiDebug.logConfig(
+      'MealPlanPage.init',
+      createAIConfigSnapshot({
+        model: settings.aiModel,
+        modelLabel: modelMetadata?.label,
+        supportsJsonResponse: modelMetadata?.supportsJsonResponse,
+        provider: import.meta.env.VITE_AI_PROXY_URL ? 'proxy' : 'openrouter',
+        metadata: modelMetadata,
+      }),
+    )
+  }, [modelMetadata, settings.aiModel])
 
   const orderedMenus = useMemo(
     () => [...dailyMenus].sort((a, b) => a.date.localeCompare(b.date)),

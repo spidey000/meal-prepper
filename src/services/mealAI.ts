@@ -6,6 +6,7 @@ import type {
   ShoppingList,
   WeeklyScheduleDay,
 } from '../types/app'
+import { aiDebug, createAIConfigSnapshot } from './aiDebug'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
@@ -16,6 +17,8 @@ const JSON_RESPONSE_FORMAT = { type: 'json_object' }
 const responseFormatSupportedModels = new Set<string>()
 let responseFormatSupportStatus: 'idle' | 'loading' | 'loaded' | 'failed' = 'idle'
 let responseFormatFetchPromise: Promise<void> | null = null
+
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
 
 const shouldRetryWithoutResponseFormat = (status: number, message: string) => {
   if (status !== 400) return false
@@ -48,8 +51,13 @@ const ensureResponseFormatSupportLoaded = async (apiKey: string) => {
     return
   }
   responseFormatFetchPromise = (async () => {
+    const startedAt = now()
     try {
       responseFormatSupportStatus = 'loading'
+      aiDebug.logCallStart({
+        source: 'ensureResponseFormatSupportLoaded',
+        request: { endpoint: `${OPENROUTER_MODELS_URL}?supported_parameters=response_format` },
+      })
       const response = await fetch(
         `${OPENROUTER_MODELS_URL}?supported_parameters=response_format`,
         {
@@ -60,7 +68,12 @@ const ensureResponseFormatSupportLoaded = async (apiKey: string) => {
       if (!response.ok) {
         responseFormatSupportStatus = 'failed'
         const message = await response.text()
-        console.warn('Unable to load response_format support list', message)
+        aiDebug.logError({
+          source: 'ensureResponseFormatSupportLoaded',
+          message: `Unable to load response_format support list (${response.status})`,
+          error: message,
+          severity: 'warn',
+        })
         return
       }
       const payload = (await response.json()) as ModelsCapabilityResponse
@@ -70,9 +83,20 @@ const ensureResponseFormatSupportLoaded = async (apiKey: string) => {
         }
       })
       responseFormatSupportStatus = 'loaded'
+      aiDebug.logCallResult({
+        source: 'ensureResponseFormatSupportLoaded',
+        status: response.status,
+        durationMs: now() - startedAt,
+        response: { loadedModels: responseFormatSupportedModels.size },
+      })
     } catch (error) {
       responseFormatSupportStatus = 'failed'
-      console.warn('Failed to fetch response_format support list', error)
+      aiDebug.logError({
+        source: 'ensureResponseFormatSupportLoaded',
+        message: 'Failed to fetch response_format support list',
+        error,
+        severity: 'warn',
+      })
     } finally {
       responseFormatFetchPromise = null
     }
@@ -115,25 +139,59 @@ async function callAI<T>({
 }: {
   messages: { role: 'system' | 'user'; content: string }[]
 } & BaseAIOptions): Promise<T> {
+  const provider = PROXY_URL ? 'proxy' : 'openrouter'
+  const configSnapshot = createAIConfigSnapshot({
+    model,
+    modelLabel,
+    supportsJsonResponse,
+    provider,
+  })
+  aiDebug.logConfig('callAI', configSnapshot)
+
   if (PROXY_URL) {
     logModelUsage(model, modelLabel)
     const preferJson = supportsJsonResponse ?? true
-    const response = await fetch(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, model, supportsJsonResponse: preferJson }),
-    })
+    const requestPayload = { messages, model, supportsJsonResponse: preferJson }
+    const startedAt = now()
+    aiDebug.logCallStart({ source: 'callAI.proxy', request: requestPayload })
+    try {
+      const response = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload),
+      })
 
-    if (!response.ok) {
-      const text = await response.text()
-      throw new Error(`AI proxy error: ${response.status} ${text}`)
+      if (!response.ok) {
+        const text = await response.text()
+        aiDebug.logError({
+          source: 'callAI.proxy',
+          message: `AI proxy error (${response.status})`,
+          error: text,
+        })
+        throw new Error(`AI proxy error: ${response.status} ${text}`)
+      }
+
+      const payload = (await response.json()) as T
+      aiDebug.logCallResult({
+        source: 'callAI.proxy',
+        status: response.status,
+        durationMs: now() - startedAt,
+        response: payload,
+      })
+      return payload
+    } catch (error) {
+      aiDebug.logError({ source: 'callAI.proxy', message: 'Proxy AI request failed', error })
+      throw error
     }
-
-    return response.json()
   }
 
   const key = apiKey ?? import.meta.env.VITE_OPENROUTER_API_KEY
   if (!key) {
+    aiDebug.logError({
+      source: 'callAI.openrouter',
+      message: 'Missing OpenRouter API key. Add it in Settings.',
+      severity: 'warn',
+    })
     throw new Error('Missing OpenRouter API key. Add it in Settings.')
   }
   logModelUsage(model, modelLabel)
@@ -146,28 +204,66 @@ async function callAI<T>({
   })
 
   const sendCompletion = async (useJsonFormat: boolean): Promise<T> => {
-    const response = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model,
-        messages,
-        ...(useJsonFormat ? { response_format: JSON_RESPONSE_FORMAT } : {}),
-      }),
-    })
-
-    if (!response.ok) {
-      const text = await response.text()
-      if (useJsonFormat && shouldRetryWithoutResponseFormat(response.status, text)) {
-        return sendCompletion(false)
-      }
-      throw new Error(`OpenRouter error: ${response.status} ${text}`)
+    const requestPayload = {
+      model,
+      messages,
+      ...(useJsonFormat ? { response_format: JSON_RESPONSE_FORMAT } : {}),
     }
+    const startedAt = now()
+    aiDebug.logCallStart({ source: 'callAI.openrouter', request: requestPayload })
+    try {
+      const response = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestPayload),
+      })
 
-    const data = await response.json()
-    const content = data?.choices?.[0]?.message?.content
-    if (!content) throw new Error('Malformed OpenRouter response')
-    return JSON.parse(content)
+      if (!response.ok) {
+        const text = await response.text()
+        if (useJsonFormat && shouldRetryWithoutResponseFormat(response.status, text)) {
+          aiDebug.logError({
+            source: 'callAI.openrouter',
+            message: 'Model does not support response_format; retrying without response_format',
+            error: text,
+            severity: 'warn',
+          })
+          return sendCompletion(false)
+        }
+        aiDebug.logError({
+          source: 'callAI.openrouter',
+          message: `OpenRouter error (${response.status})`,
+          error: text,
+        })
+        throw new Error(`OpenRouter error: ${response.status} ${text}`)
+      }
+
+      const data = await response.json()
+      const content = data?.choices?.[0]?.message?.content
+      if (!content) {
+        aiDebug.logError({
+          source: 'callAI.openrouter',
+          message: 'Malformed OpenRouter response (missing content)',
+          error: data,
+        })
+        throw new Error('Malformed OpenRouter response')
+      }
+
+      const parsed = JSON.parse(content) as T
+      aiDebug.logCallResult({
+        source: 'callAI.openrouter',
+        status: response.status,
+        durationMs: now() - startedAt,
+        response: parsed,
+      })
+      return parsed
+    } catch (error) {
+      aiDebug.logError({
+        source: 'callAI.openrouter',
+        message: 'OpenRouter completion request failed',
+        error,
+      })
+      throw error
+    }
   }
 
   return sendCompletion(preferJson)
@@ -297,5 +393,10 @@ Return JSON { "schedule": WeeklyScheduleDay[] } where each day includes events (
   if (Array.isArray(result.schedule)) {
     return result.schedule
   }
+  aiDebug.logError({
+    source: 'parseScheduleFromText',
+    message: 'Malformed schedule response from AI',
+    error: result,
+  })
   throw new Error('Malformed schedule response from AI')
 }
