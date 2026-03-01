@@ -131,6 +131,12 @@ export interface CalendarSyncSettings {
   lastSyncedAt?: string
 }
 
+export interface AppPreferences {
+  compactMode: boolean
+  showNutritionalInfo: boolean
+  autoBuildShoppingList: boolean
+}
+
 export interface UserSettings {
   preferredCuisines: string[]
   mealTypes: MealType[]
@@ -140,6 +146,7 @@ export interface UserSettings {
   apiProvider: 'openrouter'
   apiKey?: string
   calendarSync?: CalendarSyncSettings
+  appPreferences: AppPreferences
 }
 
 export interface MealPlanConfig {

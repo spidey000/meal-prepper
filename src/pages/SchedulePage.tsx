@@ -126,7 +126,13 @@ export const SchedulePage = () => {
         description="Sync your events so the AI knows when to recommend quick meals or batch cooking."
         actions={
           <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setSelectedDayId(schedule[0]?.id ?? '')}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const monday = schedule.find((day) => new Date(day.date).getDay() === 1)
+                setSelectedDayId(monday?.id ?? schedule[0]?.id ?? '')
+              }}
+            >
               Jump to Monday
             </Button>
             <Button onClick={handleParseText} disabled={isParsing || !textInput.trim()}>

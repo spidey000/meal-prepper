@@ -168,14 +168,20 @@ export async function parseScheduleFromText(
   const prompt = `Convert this human schedule into structured JSON for the week starting ${weekStart}.
 Text:
 ${text}
-Return array of WeeklyScheduleDay objects with events (summary,start,end).`;
+Return JSON { "schedule": WeeklyScheduleDay[] } where each day includes events (summary,start,end).`;
 
-  const result = await callAI<{ schedule: WeeklyScheduleDay[] }>({
+  const result = await callAI<{ schedule?: WeeklyScheduleDay[] } | WeeklyScheduleDay[]>({
     messages: [
       { role: 'system', content: 'You transform free-form calendars into structured JSON schedules.' },
       { role: 'user', content: prompt },
     ],
     ...options,
   })
-  return result.schedule
+  if (Array.isArray(result)) {
+    return result
+  }
+  if (Array.isArray(result.schedule)) {
+    return result.schedule
+  }
+  throw new Error('Malformed schedule response from AI')
 }

@@ -40,6 +40,11 @@ const defaultSettings: UserSettings = {
     connected: false,
     autoPushEvents: false,
   },
+  appPreferences: {
+    compactMode: false,
+    showNutritionalInfo: true,
+    autoBuildShoppingList: true,
+  },
 }
 
 export interface AppState {
@@ -65,7 +70,7 @@ export interface AppState {
     setShoppingList: (list: ShoppingList) => void
     toggleShoppingItem: (category: string, item: string) => void
     updateShoppingNote: (category: string, item: string, notes: string) => void
-    setSettings: (settings: Partial<UserSettings>) => void
+    setSettings: (settings: Partial<Omit<UserSettings, 'calendarSync'>>) => void
     setCalendarSyncSettings: (settings: Partial<CalendarSyncSettings>) => void
     setApiKey: (key?: string) => void
     setLastCalendarSync: (iso?: string) => void
@@ -77,9 +82,8 @@ export interface AppState {
 const emptyWeek = (): WeeklyScheduleDay[] => {
   const today = new Date()
   const start = new Date(today)
-  const day = today.getDay()
-  const diff = today.getDate() - day
-  start.setDate(diff)
+  const mondayIndex = (today.getDay() + 6) % 7
+  start.setDate(today.getDate() - mondayIndex)
   return Array.from({ length: 7 }).map((_, index) => {
     const date = new Date(start)
     date.setDate(start.getDate() + index)
@@ -130,9 +134,7 @@ export const useAppStore = create<AppState>()(
           toggleBatchCookingDay: (dayId) =>
             set((state) => ({
               schedule: state.schedule.map((day) =>
-                day.id === dayId
-                  ? { ...day, isBatchCookingDay: !day.isBatchCookingDay }
-                  : day,
+                day.id === dayId ? { ...day, isBatchCookingDay: !day.isBatchCookingDay } : day,
               ),
             })),
           removeScheduleEvent: (dayId, eventId) =>
@@ -171,6 +173,7 @@ export const useAppStore = create<AppState>()(
               recipes: recipeMap,
               dailyMenus: response.dailyMenus,
               lastGeneratedAt: new Date().toISOString(),
+              shoppingList: null,
             })
           },
           setShoppingList: (list) => set({ shoppingList: list }),
@@ -212,31 +215,47 @@ export const useAppStore = create<AppState>()(
                   }
                 : null,
             })),
-          setSettings: (settings) =>
+          setSettings: (settings: Partial<Omit<UserSettings, 'calendarSync'>>) =>
             set((state) => ({ settings: { ...state.settings, ...settings } })),
           setCalendarSyncSettings: (settings) =>
-            set((state) => ({
-              settings: {
-                ...state.settings,
-                calendarSync: {
-                  ...(state.settings.calendarSync ?? defaultSettings.calendarSync),
-                  ...settings,
+            set((state) => {
+              const fallback: CalendarSyncSettings = (defaultSettings.calendarSync ?? {
+                provider: 'google',
+                connected: false,
+                autoPushEvents: false,
+              }) as CalendarSyncSettings
+              const previous = state.settings.calendarSync ?? fallback
+              const next: CalendarSyncSettings = {
+                provider: 'google',
+                connected: settings.connected ?? previous.connected ?? false,
+                autoPushEvents: settings.autoPushEvents ?? previous.autoPushEvents ?? false,
+                calendarId: settings.calendarId ?? previous.calendarId,
+                calendarEmail: settings.calendarEmail ?? previous.calendarEmail,
+                lastSyncedAt: settings.lastSyncedAt ?? previous.lastSyncedAt,
+              }
+              return {
+                settings: {
+                  ...state.settings,
+                  calendarSync: next,
                 },
-              },
-            })),
+              }
+            }),
           setApiKey: (key) => set({ guestApiKey: key }),
           setLastCalendarSync: (iso) => set({ lastCalendarSync: iso }),
           setGenerating: (value) => set({ isGenerating: value }),
-          resetAll: () => set({
-            family: [],
-            schedule: emptyWeek(),
-            recipes: {},
-            dailyMenus: [],
-            shoppingList: null,
-            settings: defaultSettings,
-            guestApiKey: undefined,
-            lastCalendarSync: undefined,
-          }),
+          resetAll: () =>
+            set({
+              family: [],
+              schedule: emptyWeek(),
+              recipes: {},
+              dailyMenus: [],
+              shoppingList: null,
+              settings: defaultSettings,
+              guestApiKey: undefined,
+              lastGeneratedAt: undefined,
+              lastCalendarSync: undefined,
+              isGenerating: false,
+            }),
         },
       }),
       {
