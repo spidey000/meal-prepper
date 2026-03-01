@@ -48,9 +48,9 @@ export default {
         sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        glow: '0 0 40px -10px rgba(251, 146, 60, 0.15)',
-        card: '0 10px 40px -10px rgba(0, 0, 0, 0.4)',
-        'card-hover': '0 20px 50px -12px rgba(0, 0, 0, 0.5)',
+        glow: '0 0 20px -5px rgba(251, 146, 60, 0.15)',
+        card: '0 4px 20px -5px rgba(0, 0, 0, 0.3)',
+        'card-hover': '0 8px 30px -8px rgba(0, 0, 0, 0.4)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

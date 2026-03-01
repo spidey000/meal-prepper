@@ -85,7 +85,7 @@ export const AppLayout = () => {
       <aside
         className={clsx(
           // Base styles
-          'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-surface-700/50 bg-surface-900/80 backdrop-blur-xl transition-all duration-300 ease-in-out',
+          'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-surface-700/50 bg-surface-900/80 backdrop-blur-md transition-all duration-300 ease-in-out will-change-transform',
           // Desktop: collapse/expand
           'lg:relative lg:z-auto',
           sidebarCollapsed && isDesktop ? 'lg:w-20' : 'lg:w-64',
@@ -189,7 +189,7 @@ export const AppLayout = () => {
         {/* Header */}
         <header
           className={clsx(
-            'flex flex-wrap items-center justify-between gap-4 border-b border-surface-700/50 bg-surface-900/60 px-6 py-4 backdrop-blur-xl',
+            'flex flex-wrap items-center justify-between gap-4 border-b border-surface-700/50 bg-surface-900/60 px-6 py-4 backdrop-blur-md',
             compact ? 'px-4 py-3' : 'px-6 py-4',
           )}
         >

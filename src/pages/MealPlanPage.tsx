@@ -179,12 +179,8 @@ export const MealPlanPage = () => {
         </Card>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
-        {orderedMenus.map((menu, index) => (
-          <Card
-            key={menu.date}
-            className="animate-slide-up space-y-4"
-            style={{ animationDelay: `${index * 50}ms` }}
-          >
+        {orderedMenus.map((menu) => (
+          <Card key={menu.date} className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-ember-500/10 bg-gradient-to-br from-ember-500/20 to-brand-500/20">
