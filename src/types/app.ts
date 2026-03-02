@@ -140,6 +140,23 @@ export interface AppPreferences {
   sidebarMobileOpen: boolean
 }
 
+export type CookExperience = 'beginner' | 'home_cook' | 'experienced' | 'professional_chef'
+export type ExplanationDepth = 'basic' | 'intermediate' | 'advanced' | 'professional_technical'
+export type StepDetailLevel = 'concise' | 'detailed' | 'very_detailed' | 'pedagogical_step_by_step'
+export type AvailableEquipment =
+  | 'basic_kitchen'
+  | 'well_equipped_home_kitchen'
+  | 'advanced_kitchen'
+  | 'professional_kitchen'
+
+export interface AIPromptSettings {
+  cookExperience: CookExperience
+  explanationDepth: ExplanationDepth
+  stepDetailLevel: StepDetailLevel
+  availableEquipment: AvailableEquipment
+  customPromptTemplate: string
+}
+
 export interface ModelPricingMetadata {
   prompt?: number
   completion?: number
@@ -167,6 +184,7 @@ export interface UserSettings {
   calendarSync?: CalendarSyncSettings
   appPreferences: AppPreferences
   aiModelMetadata?: OpenRouterModelMetadata
+  aiPromptSettings: AIPromptSettings
 }
 
 export interface MealPlanConfig {

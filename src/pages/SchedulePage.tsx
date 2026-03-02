@@ -8,7 +8,7 @@ import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Button } from '../components/ui/Button'
 import { ModelSummary } from '../components/ModelSummary'
-import { parseScheduleFromText } from '../services/mealAI'
+import { parseScheduleFromText, type BaseAIOptions } from '../services/mealAI'
 import { fetchCalendarWeek } from '../services/calendar'
 
 export const SchedulePage = () => {
@@ -18,7 +18,9 @@ export const SchedulePage = () => {
   const [isParsing, setIsParsing] = useState(false)
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
-  const [eventDrafts, setEventDrafts] = useState<Record<string, { summary: string; start: string; end: string }>>({})
+  const [eventDrafts, setEventDrafts] = useState<
+    Record<string, { summary: string; start: string; end: string }>
+  >({})
 
   const selectedDay = useMemo(
     () => schedule.find((day) => day.id === selectedDayId) ?? schedule[0],
@@ -30,10 +32,11 @@ export const SchedulePage = () => {
   const selectedFreeBlocks = selectedDay?.freeBlocks ?? []
   const isBatchCookingDay = selectedDay?.isBatchCookingDay ?? false
   const modelMetadata = settings.aiModelMetadata
-  const aiOptions = {
+  const aiOptions: BaseAIOptions = {
     apiKey: settings.apiKey ?? guestApiKey,
     model: settings.aiModel,
     modelLabel: modelMetadata?.label,
+    supportsJsonResponse: modelMetadata?.supportsJsonResponse,
   }
 
   const formatTimeValue = (value: string) => {
@@ -47,7 +50,8 @@ export const SchedulePage = () => {
     return value
   }
 
-  const formatFreeBlock = (start: string, end: string) => `${formatTimeValue(start)} → ${formatTimeValue(end)}`
+  const formatFreeBlock = (start: string, end: string) =>
+    `${formatTimeValue(start)} → ${formatTimeValue(end)}`
 
   const weekStart = schedule[0]?.date ?? new Date().toISOString().split('T')[0]
 
@@ -109,11 +113,13 @@ export const SchedulePage = () => {
     if (!textInput.trim()) return
     try {
       setIsParsing(true)
-      const parsed = await parseScheduleFromText(textInput, weekStart, aiOptions)
-      parsed.forEach((day) => actions.upsertScheduleDay({
-        ...day,
-        id: schedule.find((existing) => existing.date === day.date)?.id ?? nanoid(),
-      }))
+      const parsed = await parseScheduleFromText(textInput, weekStart, settings, aiOptions)
+      parsed.forEach((day) =>
+        actions.upsertScheduleDay({
+          ...day,
+          id: schedule.find((existing) => existing.date === day.date)?.id ?? nanoid(),
+        }),
+      )
       setTextInput('')
     } catch (error) {
       console.error(error)
@@ -205,10 +211,16 @@ export const SchedulePage = () => {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-slate-600">Batch cooking day</p>
-                      <p className="text-xs text-slate-500">Scale recipes and cook ahead when time allows.</p>
+                      <p className="text-xs text-slate-500">
+                        Scale recipes and cook ahead when time allows.
+                      </p>
                     </div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                      <input type="checkbox" checked={isBatchCookingDay} onChange={toggleBatchCookingDay} />
+                      <input
+                        type="checkbox"
+                        checked={isBatchCookingDay}
+                        onChange={toggleBatchCookingDay}
+                      />
                       {isBatchCookingDay ? 'On' : 'Off'}
                     </label>
                   </div>
@@ -218,13 +230,18 @@ export const SchedulePage = () => {
                   {selectedFreeBlocks.length > 0 ? (
                     <ul className="mt-2 space-y-1 text-sm text-slate-600">
                       {selectedFreeBlocks.map((block, index) => (
-                        <li key={`${block.start}-${block.end}-${index}`} className="flex items-center justify-between">
+                        <li
+                          key={`${block.start}-${block.end}-${index}`}
+                          className="flex items-center justify-between"
+                        >
                           <span>{formatFreeBlock(block.start, block.end)}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2 text-xs text-slate-500">Sync Google Calendar to detect open prep time.</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Sync Google Calendar to detect open prep time.
+                    </p>
                   )}
                 </div>
               </div>
@@ -233,10 +250,15 @@ export const SchedulePage = () => {
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {(['lunch', 'dinner'] as const).map((meal) => (
                     <div key={meal} className="rounded-2xl border border-slate-200 p-4">
-                      <p className="text-sm font-medium text-slate-600">{meal === 'lunch' ? 'Lunch' : 'Dinner'} diners</p>
+                      <p className="text-sm font-medium text-slate-600">
+                        {meal === 'lunch' ? 'Lunch' : 'Dinner'} diners
+                      </p>
                       <div className="mt-3 space-y-2">
                         {family.map((member) => (
-                          <label key={member.id} className="flex items-center gap-2 text-sm text-slate-600">
+                          <label
+                            key={member.id}
+                            className="flex items-center gap-2 text-sm text-slate-600"
+                          >
                             <input
                               type="checkbox"
                               checked={selectedDay.diners[meal].includes(member.id)}
@@ -260,7 +282,10 @@ export const SchedulePage = () => {
                     <p className="text-sm text-slate-500">No events logged for this day.</p>
                   )}
                   {selectedDay.events.map((event) => (
-                    <div key={event.id} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+                    <div
+                      key={event.id}
+                      className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm"
+                    >
                       <div>
                         <p className="text-sm font-medium text-slate-900">{event.summary}</p>
                         <p className="text-xs text-slate-500">
@@ -321,7 +346,11 @@ export const SchedulePage = () => {
                     }
                   />
                 </div>
-                <Button className="mt-3" variant="secondary" onClick={() => handleAddEvent(selectedDay.id)}>
+                <Button
+                  className="mt-3"
+                  variant="secondary"
+                  onClick={() => handleAddEvent(selectedDay.id)}
+                >
                   Add event
                 </Button>
               </div>
@@ -334,12 +363,15 @@ export const SchedulePage = () => {
               <RefreshCcw className="h-4 w-4" /> Google Calendar sync
             </div>
             <p className="mt-2 text-sm text-slate-500">
-              Pull your busy/free windows from Google Calendar so recipe durations adjust automatically.
+              Pull your busy/free windows from Google Calendar so recipe durations adjust
+              automatically.
             </p>
             <dl className="mt-4 space-y-2 text-sm text-slate-600">
               <div className="flex items-center justify-between">
                 <dt>Status</dt>
-                <dd className={`font-medium ${isCalendarConnected ? 'text-green-600' : 'text-orange-600'}`}>
+                <dd
+                  className={`font-medium ${isCalendarConnected ? 'text-green-600' : 'text-orange-600'}`}
+                >
                   {isCalendarConnected ? 'Connected to Google' : 'Not connected'}
                 </dd>
               </div>
@@ -371,7 +403,8 @@ export const SchedulePage = () => {
               <CalendarDays className="h-4 w-4" /> Quick text import
             </div>
             <p className="mt-2 text-sm text-slate-500">
-              Paste your schedule ("Mon 8:00 school drop-off") and let the AI convert it into structured availability.
+              Paste your schedule ("Mon 8:00 school drop-off") and let the AI convert it into
+              structured availability.
             </p>
             <Textarea
               rows={12}
@@ -381,7 +414,11 @@ export const SchedulePage = () => {
 Tue 15:00-18:00 Soccer practice for Max"
               className="mt-4"
             />
-            <Button className="mt-4 w-full" onClick={handleParseText} disabled={isParsing || !textInput.trim()}>
+            <Button
+              className="mt-4 w-full"
+              onClick={handleParseText}
+              disabled={isParsing || !textInput.trim()}
+            >
               {isParsing ? 'Parsing schedule…' : 'Parse schedule text'}
             </Button>
           </Card>

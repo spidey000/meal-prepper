@@ -52,6 +52,13 @@ const createDefaultSettings = (): UserSettings => ({
   },
   appPreferences: { ...defaultAppPreferences },
   aiModelMetadata: undefined,
+  aiPromptSettings: {
+    cookExperience: 'home_cook',
+    explanationDepth: 'intermediate',
+    stepDetailLevel: 'detailed',
+    availableEquipment: 'well_equipped_home_kitchen',
+    customPromptTemplate: '',
+  },
 })
 
 const defaultSettings: UserSettings = createDefaultSettings()

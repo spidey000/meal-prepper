@@ -11,6 +11,7 @@ import type {
   Recipe,
   ShoppingList,
   WeeklyScheduleDay,
+  UserSettings,
 } from '../types/app'
 import { aiDebug, createAIConfigSnapshot } from './aiDebug'
 
@@ -70,6 +71,75 @@ const MEAL_PLAN_JSON_SCHEMA = `{
     }
   ]
 }`
+
+const DEFAULT_PROMPT_TEMPLATE = `You are an experienced family nutritionist and culinary educator. Your task is to generate detailed meal plans and recipes tailored to the specific cooking context provided.
+
+COOKING CONTEXT (variables are auto-replaced):
+- Cook experience level: {cook_experience}
+- Explanation depth needed: {explanation_depth}
+- Step detail level: {step_detail_level}
+- Available kitchen equipment: {available_equipment}
+
+CRITICAL INSTRUCTIONS FOR RECIPES:
+
+1. DETAILED INSTRUCTIONS: Provide comprehensive, step-by-step guidance including:
+   - Preparation steps: chopping, marinating, resting, preheating
+   - Exact cooking temperatures (in °F and °C when applicable) and precise times
+   - Visual, tactile, and olfactory doneness cues (NOT just "cook until done")
+   - Common mistakes to avoid and how to fix them
+   - Proper food safety and handling tips
+   - Storage instructions (refrigeration duration, freezer suitability)
+   - Reheating methods that preserve quality
+   - Make-ahead opportunities and time-saving tips
+
+2. ADAPT TO EXPERIENCE LEVEL:
+   - For "beginner": Explain basic techniques, knife skills, terminology
+   - For "home_cook": Assume basic competence, focus on refinement
+   - For "experienced": Skip basics, include pro tips and advanced techniques
+   - For "professional_chef": Use technical language, assume full kitchen
+
+3. EQUIPMENT AWARENESS:
+   - Only specify tools from "available_equipment" list
+   - Suggest substitutions if needed tools are missing
+   - Note equipment limitations that affect technique
+
+4. EXPLANATION DEPTH:
+   - "basic": Simple, clear steps with minimal explanation
+   - "intermediate": Reasoning behind key steps
+   - "advanced": Scientific/technical details, alternative methods
+   - "professional_technical": Professional techniques, industry standards
+
+5. STEP DETAIL LEVEL:
+   - "concise": 1-2 sentences per step
+   - "detailed": 3-4 sentences with key details
+   - "very_detailed": Paragraph-style with tips embedded
+   - "pedagogical_step_by_step": Teach as if to a student, with why's
+
+6. ALWAYS INCLUDE:
+   - Prep time and cooking time estimates
+   - Number of servings
+   - Difficulty rating matching cook experience
+   - Ingredient quantities with precise units
+   - Nutritional information (when relevant)
+
+Return STRICT JSON ONLY matching the provided schema. The JSON must contain all required fields and be parseable.`
+
+function buildPrompt(settings: UserSettings, contextData: string): string {
+  const { aiPromptSettings } = settings
+
+  // Get template: custom if provided, else default
+  const template = aiPromptSettings.customPromptTemplate?.trim() || DEFAULT_PROMPT_TEMPLATE
+
+  // Replace placeholders
+  const prompt = template
+    .replace(/{cook_experience}/g, aiPromptSettings.cookExperience)
+    .replace(/{explanation_depth}/g, aiPromptSettings.explanationDepth)
+    .replace(/{step_detail_level}/g, aiPromptSettings.stepDetailLevel)
+    .replace(/{available_equipment}/g, aiPromptSettings.availableEquipment)
+
+  // Append the context-specific data (family, schedule, etc.)
+  return prompt + '\n\n' + contextData
+}
 
 const responseFormatSupportedModels = new Set<string>()
 let responseFormatSupportStatus: 'idle' | 'loading' | 'loaded' | 'failed' = 'idle'
@@ -571,8 +641,7 @@ export async function generateMealPlan(
   config: MealPlanConfig,
   options: BaseAIOptions,
 ): Promise<MealPlanResponse> {
-  const prompt = `You are an experienced family nutritionist. Build a 7 day menu for the household using STRICT JSON only.
-Family members: ${JSON.stringify(summarizeFamily(config.members))}
+  const contextData = `Family members: ${JSON.stringify(summarizeFamily(config.members))}
 Weekly schedule availability: ${JSON.stringify(summarizeSchedule(config.schedule))}
 Meal types requested: ${JSON.stringify(config.settings.mealTypes)}
 Preferred cuisines: ${JSON.stringify(config.settings.preferredCuisines)}
@@ -585,6 +654,8 @@ ${MEAL_PLAN_JSON_SCHEMA}
 \`\`\`
 
 Recipe ingredients must include quantity and unit. Use freeBlocks to schedule prep and treat days with isBatchCookingDay=true as long, scalable cook sessions with leftovers.`
+
+  const prompt = buildPrompt(config.settings, contextData)
 
   const rawResponse = await callAI<RawMealPlanResponse>({
     messages: [
@@ -610,12 +681,15 @@ export async function regenerateMeal(
   },
   options: BaseAIOptions,
 ): Promise<Recipe> {
-  const prompt = `Regenerate a recipe for ${meal.mealType} on ${meal.date}. Avoid repeating ${previousRecipe ?? 'the previous dish'}.
+  const contextData = `Regenerate a recipe for ${meal.mealType} on ${meal.date}. Avoid repeating ${previousRecipe ?? 'the previous dish'}.
 Family members: ${JSON.stringify(summarizeFamily(config.members))}
 Schedule: ${JSON.stringify(summarizeSchedule(config.schedule))}
 Preferred cuisines: ${JSON.stringify(config.settings.preferredCuisines)}
 ${excludedIngredients && excludedIngredients.length > 0 ? `Avoid these ingredients: ${excludedIngredients.join(', ')}` : ''}
-Return JSON Recipe object.`
+
+Return a JSON Recipe object with all required fields.`
+
+  const prompt = buildPrompt(config.settings, contextData)
 
   return callAI<Recipe>({
     messages: [
@@ -630,13 +704,20 @@ Return JSON Recipe object.`
 }
 
 export async function generateShoppingList(
-  { recipes, weekStartDate }: { recipes: Recipe[]; weekStartDate: string },
+  {
+    recipes,
+    weekStartDate,
+    settings,
+  }: { recipes: Recipe[]; weekStartDate: string; settings: UserSettings },
   options: BaseAIOptions,
 ): Promise<ShoppingList> {
-  const prompt = `Combine these recipes into a shopping list grouped by grocery aisle.
+  const contextData = `Combine these recipes into a shopping list grouped by grocery aisle.
 Week start: ${weekStartDate}
 Recipes: ${JSON.stringify(recipes)}
-Return JSON { "weekStartDate": string, "categories": [{"categoryName": string, "items": [{"item": string, "quantity": number, "unit": string, "estimatedPrice": number, "notes": string}]}], "estimatedTotalCost": number }`
+
+Return JSON with structure: { "weekStartDate": string, "categories": [{"categoryName": string, "items": [{"item": string, "quantity": number, "unit": string, "estimatedPrice": number, "notes": string}]}], "estimatedTotalCost": number }`
+
+  const prompt = buildPrompt(settings, contextData)
 
   return callAI<ShoppingList>({
     messages: [
@@ -650,12 +731,15 @@ Return JSON { "weekStartDate": string, "categories": [{"categoryName": string, "
 export async function parseScheduleFromText(
   text: string,
   weekStart: string,
+  settings: UserSettings,
   options: BaseAIOptions,
 ): Promise<WeeklyScheduleDay[]> {
-  const prompt = `Convert this human schedule into structured JSON for the week starting ${weekStart}.
+  const contextData = `Convert this human schedule into structured JSON for the week starting ${weekStart}.
 Text:
 ${text}
 Return JSON { "schedule": WeeklyScheduleDay[] } where each day includes events (summary,start,end).`
+
+  const prompt = buildPrompt(settings, contextData)
 
   const result = await callAI<{ schedule?: WeeklyScheduleDay[] } | WeeklyScheduleDay[]>({
     messages: [

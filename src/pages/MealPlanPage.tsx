@@ -10,7 +10,14 @@ import { ModelSummary } from '../components/ModelSummary'
 import { generateMealPlan, regenerateMeal, generateShoppingList } from '../services/mealAI'
 import { aiDebug, createAIConfigSnapshot } from '../services/aiDebug'
 import type { BaseAIOptions } from '../services/mealAI'
-import type { DailyMenu, MealPlanResponse, MealType, Recipe, ShoppingList } from '../types/app'
+import type {
+  DailyMenu,
+  MealPlanResponse,
+  MealType,
+  Recipe,
+  ShoppingList,
+  UserSettings,
+} from '../types/app'
 
 const mealLabels: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -80,7 +87,13 @@ export const MealPlanPage = () => {
       const plan = await generateMealPlan(config, aiOptions)
       actions.setMealPlan(plan)
       if (appPreferences.autoBuildShoppingList) {
-        await buildShoppingListFromPlan(plan, weekStart, aiOptions, actions.setShoppingList)
+        await buildShoppingListFromPlan(
+          plan,
+          weekStart,
+          settings,
+          aiOptions,
+          actions.setShoppingList,
+        )
       }
     } catch (error) {
       console.error(error)
@@ -130,7 +143,7 @@ export const MealPlanPage = () => {
     }
     try {
       const list = await generateShoppingList(
-        { recipes: recipeList, weekStartDate: weekStart },
+        { recipes: recipeList, weekStartDate: weekStart, settings },
         aiOptions,
       )
       actions.setShoppingList(list)
@@ -309,6 +322,7 @@ const collectRecipesFromMenus = (menus: DailyMenu[], recipeMap: Record<string, R
 const buildShoppingListFromPlan = async (
   plan: MealPlanResponse,
   weekStart: string,
+  settings: UserSettings,
   options: BaseAIOptions,
   setShoppingList: (list: ShoppingList) => void,
 ) => {
@@ -320,7 +334,7 @@ const buildShoppingListFromPlan = async (
   if (recipeList.length === 0) return
   try {
     const list = await generateShoppingList(
-      { recipes: recipeList, weekStartDate: weekStart },
+      { recipes: recipeList, weekStartDate: weekStart, settings },
       options,
     )
     setShoppingList(list)

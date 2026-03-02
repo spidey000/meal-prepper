@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAppStore, defaultAppPreferences } from '../store/appStore'
 import { useAuth } from '../app/auth/useAuth'
@@ -6,8 +6,17 @@ import { SectionHeader } from '../components/SectionHeader'
 import { Card } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
+import { Select } from '../components/ui/Select'
+import { Textarea } from '../components/ui/Textarea'
 import { ModelSummary } from '../components/ModelSummary'
-import type { AppPreferences, MealType } from '../types/app'
+import type {
+  AppPreferences,
+  MealType,
+  CookExperience,
+  ExplanationDepth,
+  StepDetailLevel,
+  AvailableEquipment,
+} from '../types/app'
 import {
   isModelFree,
   listOpenRouterModels,
@@ -16,6 +25,67 @@ import {
 } from '../services/openrouter'
 import { Moon, Sun } from 'lucide-react'
 import clsx from 'clsx'
+
+const PLACEHOLDERS = [
+  { value: '{cook_experience}', label: 'cook_experience' },
+  { value: '{explanation_depth}', label: 'explanation_depth' },
+  { value: '{step_detail_level}', label: 'step_detail_level' },
+  { value: '{available_equipment}', label: 'available_equipment' },
+] as const
+
+function getDefaultPromptTemplate(): string {
+  return `You are an experienced family nutritionist and culinary educator. Your task is to generate detailed meal plans and recipes tailored to the specific cooking context provided.
+
+COOKING CONTEXT (variables are auto-replaced):
+- Cook experience level: {cook_experience}
+- Explanation depth needed: {explanation_depth}
+- Step detail level: {step_detail_level}
+- Available kitchen equipment: {available_equipment}
+
+CRITICAL INSTRUCTIONS FOR RECIPES:
+
+1. DETAILED INSTRUCTIONS: Provide comprehensive, step-by-step guidance including:
+   - Preparation steps: chopping, marinating, resting, preheating
+   - Exact cooking temperatures (in °F and °C when applicable) and precise times
+   - Visual, tactile, and olfactory doneness cues (NOT just "cook until done")
+   - Common mistakes to avoid and how to fix them
+   - Proper food safety and handling tips
+   - Storage instructions (refrigeration duration, freezer suitability)
+   - Reheating methods that preserve quality
+   - Make-ahead opportunities and time-saving tips
+
+2. ADAPT TO EXPERIENCE LEVEL:
+   - For "beginner": Explain basic techniques, knife skills, terminology
+   - For "home_cook": Assume basic competence, focus on refinement
+   - For "experienced": Skip basics, include pro tips and advanced techniques
+   - For "professional_chef": Use technical language, assume full kitchen
+
+3. EQUIPMENT AWARENESS:
+   - Only specify tools from "available_equipment" list
+   - Suggest substitutions if needed tools are missing
+   - Note equipment limitations that affect technique
+
+4. EXPLANATION DEPTH:
+   - "basic": Simple, clear steps with minimal explanation
+   - "intermediate": Reasoning behind key steps
+   - "advanced": Scientific/technical details, alternative methods
+   - "professional_technical": Professional techniques, industry standards
+
+5. STEP DETAIL LEVEL:
+   - "concise": 1-2 sentences per step
+   - "detailed": 3-4 sentences with key details
+   - "very_detailed": Paragraph-style with tips embedded
+   - "pedagogical_step_by_step": Teach as if to a student, with why's
+
+6. ALWAYS INCLUDE:
+   - Prep time and cooking time estimates
+   - Number of servings
+   - Difficulty rating matching cook experience
+   - Ingredient quantities with precise units
+   - Nutritional information (when relevant)
+
+Return STRICT JSON ONLY matching the provided schema.`
+}
 
 const cuisineLibrary = [
   'Mediterranean',
@@ -39,6 +109,7 @@ const sections = [
   { id: 'meals', label: 'Meal planning' },
   { id: 'calendar', label: 'Calendar sync' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'prompts', label: 'AI Prompts' },
   { id: 'app', label: 'App preferences' },
 ] as const
 
@@ -86,6 +157,7 @@ export const SettingsPage = () => {
   const [newCuisine, setNewCuisine] = useState('')
   const [modelSearch, setModelSearch] = useState('')
   const [showFreeOnly, setShowFreeOnly] = useState(false)
+  const promptTextareaRef = useRef<HTMLTextAreaElement>(null)
   const apiKeyValue = settings.apiKey ?? guestApiKey ?? ''
   const resolvedApiKey = (settings.apiKey ?? guestApiKey)?.trim() || undefined
 
@@ -512,6 +584,193 @@ export const SettingsPage = () => {
                     Dark mode is enabled by default for a refined, easy-on-the-eyes experience while
                     planning your meals.
                   </p>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {activeSection === 'prompts' && (
+            <div className="space-y-6">
+              <Card>
+                <h3 className="text-lg font-semibold text-surface-100">AI Prompt Customization</h3>
+                <p className="mt-2 text-sm text-surface-400">
+                  Customize how the AI generates recipes. Variables are replaced with your selected
+                  settings.
+                </p>
+
+                <div className="mt-6 grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-surface-300">
+                      Cook Experience
+                    </label>
+                    <Select
+                      value={settings.aiPromptSettings.cookExperience}
+                      onChange={(e) =>
+                        actions.setSettings({
+                          aiPromptSettings: {
+                            ...settings.aiPromptSettings,
+                            cookExperience: e.target.value as CookExperience,
+                          },
+                        })
+                      }
+                      className="mt-2"
+                    >
+                      <option value="beginner">Beginner</option>
+                      <option value="home_cook">Home Cook</option>
+                      <option value="experienced">Experienced</option>
+                      <option value="professional_chef">Professional Chef</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-surface-300">
+                      Explanation Depth
+                    </label>
+                    <Select
+                      value={settings.aiPromptSettings.explanationDepth}
+                      onChange={(e) =>
+                        actions.setSettings({
+                          aiPromptSettings: {
+                            ...settings.aiPromptSettings,
+                            explanationDepth: e.target.value as ExplanationDepth,
+                          },
+                        })
+                      }
+                      className="mt-2"
+                    >
+                      <option value="basic">Basic</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                      <option value="professional_technical">Professional Technical</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-surface-300">
+                      Step Detail Level
+                    </label>
+                    <Select
+                      value={settings.aiPromptSettings.stepDetailLevel}
+                      onChange={(e) =>
+                        actions.setSettings({
+                          aiPromptSettings: {
+                            ...settings.aiPromptSettings,
+                            stepDetailLevel: e.target.value as StepDetailLevel,
+                          },
+                        })
+                      }
+                      className="mt-2"
+                    >
+                      <option value="concise">Concise</option>
+                      <option value="detailed">Detailed</option>
+                      <option value="very_detailed">Very Detailed</option>
+                      <option value="pedagogical_step_by_step">Pedagogical Step-by-Step</option>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-surface-300">
+                      Available Equipment
+                    </label>
+                    <Select
+                      value={settings.aiPromptSettings.availableEquipment}
+                      onChange={(e) =>
+                        actions.setSettings({
+                          aiPromptSettings: {
+                            ...settings.aiPromptSettings,
+                            availableEquipment: e.target.value as AvailableEquipment,
+                          },
+                        })
+                      }
+                      className="mt-2"
+                    >
+                      <option value="basic_kitchen">Basic Kitchen</option>
+                      <option value="well_equipped_home_kitchen">Well-Equipped Home Kitchen</option>
+                      <option value="advanced_kitchen">Advanced Kitchen</option>
+                      <option value="professional_kitchen">Professional Kitchen</option>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="mt-8 border-t border-surface-700/30 pt-6">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-surface-300">
+                      Custom Prompt Template
+                    </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        actions.setSettings({
+                          aiPromptSettings: {
+                            ...settings.aiPromptSettings,
+                            customPromptTemplate: getDefaultPromptTemplate(),
+                          },
+                        })
+                      }
+                      className="text-orange-400 hover:bg-orange-500/10 hover:text-orange-300"
+                    >
+                      Reset to Default
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-xs text-surface-500">
+                    Edit your prompt template below. Use the buttons below to insert variables at
+                    cursor position.
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-surface-500">Insert:</span>
+                    {PLACEHOLDERS.map((p) => (
+                      <Button
+                        key={p.value}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const ta = promptTextareaRef.current
+                          if (ta) {
+                            const start = ta.selectionStart ?? ta.value.length
+                            const end = ta.selectionEnd ?? ta.value.length
+                            const newVal =
+                              ta.value.substring(0, start) + p.value + ta.value.substring(end)
+                            actions.setSettings({
+                              aiPromptSettings: {
+                                ...settings.aiPromptSettings,
+                                customPromptTemplate: newVal,
+                              },
+                            })
+                            setTimeout(() => {
+                              ta.focus()
+                              ta.selectionStart = ta.selectionEnd = start + p.value.length
+                            }, 0)
+                          }
+                        }}
+                        className="border border-surface-700 bg-surface-800 font-mono text-xs hover:border-ember-500/50"
+                      >
+                        {p.value}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Textarea
+                    ref={promptTextareaRef}
+                    value={settings.aiPromptSettings.customPromptTemplate}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 8000) {
+                        actions.setSettings({
+                          aiPromptSettings: {
+                            ...settings.aiPromptSettings,
+                            customPromptTemplate: e.target.value,
+                          },
+                        })
+                      }
+                    }}
+                    placeholder="Enter your custom prompt template here. Use the placeholder buttons above to insert variables like {cook_experience}, {explanation_depth}, etc."
+                    className="mt-3 font-mono text-xs"
+                    rows={10}
+                    maxLength={8000}
+                  />
+                  <div className="mt-2 flex items-center justify-end">
+                    <p className="text-xs text-surface-500">
+                      {settings.aiPromptSettings.customPromptTemplate.length}/8000 characters
+                    </p>
+                  </div>
                 </div>
               </Card>
             </div>
